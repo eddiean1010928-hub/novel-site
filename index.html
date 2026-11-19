@@ -109,17 +109,17 @@
 </div>
 
 <script>
-  // ================= 設定區（請填入你的 GitHub 帳號與 Repo 名稱） =================
+  // ================= 設定區 =================
   const CONFIG = {
-    GITHUB_OWNER: "你的GitHub帳號",
-    GITHUB_REPO: "你的Repo名稱",
+    GITHUB_OWNER: "eddiean1010928-hub",
+    GITHUB_REPO: "novel-site",
     TOKEN_PART1: "github_pat_11CTTY22Y0GvOULJTqrTKc_6Ye6JGKtBoU3As2",
     TOKEN_PART2: "AgrlvGpv1GWxHeLlFIXXS7zGro3JTC3WK7SUvBwRdyPl",
     OWNER_USER: "eddiean1010928",
     OWNER_PASS: "eddie0928"
   };
   const FULL_TOKEN = CONFIG.TOKEN_PART1 + CONFIG.TOKEN_PART2;
-  // =============================================================================
+  // ============================================
 
   let usersData = [];
   let usersSha = "";
@@ -137,14 +137,18 @@
     return username === CONFIG.OWNER_USER;
   }
 
-  // GitHub API 讀取 JSON
+  // GitHub API 讀取 JSON（顯示詳細錯誤）
   async function fetchGitHubFile(path) {
     const url = `https://api.github.com/repos/${CONFIG.GITHUB_OWNER}/${CONFIG.GITHUB_REPO}/contents/${path}?t=${Date.now()}`;
     const res = await fetch(url, {
       headers: { Authorization: `token ${FULL_TOKEN}` }
     });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`${path} -> HTTP ${res.status}: ${errText}`);
+    }
     const data = await res.json();
-    const content = decodeURIComponent(escape(atob(data.content)));
+    const content = decodeURIComponent(escape(atob(data.content.replace(/\n/g, ""))));
     return { json: JSON.parse(content), sha: data.sha };
   }
 
@@ -160,6 +164,10 @@
       },
       body: JSON.stringify({ message, content: contentEncoded, sha })
     });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`寫入 ${path} 失敗 -> HTTP ${res.status}: ${errText}`);
+    }
     const result = await res.json();
     return result.content.sha;
   }
@@ -175,7 +183,7 @@
       novelsData = nRes.json;
       novelsSha = nRes.sha;
     } catch (e) {
-      alert("讀取資料庫失敗，請檢查 CONFIG 設定與 Repo 內的 password.json、novels.json 是否存在！");
+      alert("讀取資料庫失敗：\n" + e.message);
       console.error(e);
     }
   }
@@ -238,7 +246,6 @@
     const password = document.getElementById("login-pass").value;
     await loadAllData();
 
-    // 站長專屬帳密驗證
     if (username === CONFIG.OWNER_USER && password === CONFIG.OWNER_PASS) {
       let ownerUser = usersData.find(u => u.username === CONFIG.OWNER_USER);
       if (!ownerUser) {
