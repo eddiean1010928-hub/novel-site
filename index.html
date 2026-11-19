@@ -89,27 +89,30 @@
     <div id="novel-list">載入中...</div>
   </div>
 
-  <!-- 3. 單一作品畫面（在這裡才能按「編輯」與「新增篇章」） -->
+  <!-- 3. 單一作品畫面（在這裡才能按「編輯標題與簡介」、「編輯篇章」與「新增篇章」） -->
   <div id="novel-detail-section" class="hidden">
     <button class="secondary small" onclick="showSection('home-section')">← 返回作品列表</button>
     <h2 id="detail-title"></h2>
     <p id="detail-author" style="color:var(--primary); font-weight:bold; margin:4px 0;"></p>
-    <p id="detail-desc" style="color:#555;"></p>
+    <p id="detail-desc" style="color:#555; white-space:pre-wrap;"></p>
     <p id="detail-progress" style="font-size:14px; font-weight:bold;"></p>
     <button id="btn-detail-continue" class="success hidden" onclick="continueActiveNovel()">繼續上次進度閱讀</button>
 
-    <!-- 僅限有權限的作者或站長在作品畫面內看到「編輯」與「新增篇章」 -->
+    <!-- 僅限有權限的作者或站長在作品畫面內看到 -->
     <div id="author-novel-actions" class="hidden" style="margin-top:10px;">
-      <button class="secondary small" onclick="toggleEditNovelPanel()">編輯作品資訊</button>
+      <button class="secondary small" onclick="toggleEditNovelPanel()">編輯標題與簡介</button>
       <button class="small" onclick="toggleAddChapterPanel()">新增篇章</button>
     </div>
 
-    <!-- 編輯作品資訊面板 -->
+    <!-- 編輯作品標題與簡介面板 -->
     <div id="edit-novel-panel" class="panel hidden">
-      <h3>編輯作品資訊</h3>
-      <input type="text" id="edit-novel-title-input" placeholder="作品名稱">
-      <textarea id="edit-novel-desc-input" rows="2" placeholder="作品簡介"></textarea>
-      <button class="success" onclick="saveNovelInfo()">儲存作品修改</button>
+      <h3>編輯作品標題與簡介</h3>
+      <label style="font-size:14px; font-weight:bold;">作品標題</label>
+      <input type="text" id="edit-novel-title-input" placeholder="輸入新的作品標題">
+      <label style="font-size:14px; font-weight:bold;">作品簡介</label>
+      <textarea id="edit-novel-desc-input" rows="3" placeholder="輸入新的作品簡介"></textarea>
+      <button class="success" onclick="saveNovelInfo()">儲存標題與簡介</button>
+      <button class="secondary" onclick="document.getElementById('edit-novel-panel').classList.add('hidden')">取消</button>
     </div>
 
     <!-- 新增篇章面板 -->
@@ -118,6 +121,7 @@
       <input type="text" id="new-chapter-title" placeholder="篇章標題（例如：第一章 命運的開端）">
       <textarea id="new-chapter-content" rows="10" placeholder="輸入篇章內文（約 20 行自動分一頁）..."></textarea>
       <button onclick="addChapterToNovel()">發布此篇章</button>
+      <button class="secondary" onclick="document.getElementById('add-chapter-panel').classList.add('hidden')">取消</button>
     </div>
 
     <!-- 編輯指定章節面板 -->
@@ -411,7 +415,6 @@
     showSection("home-section");
   }
 
-  // 儲存寫作者筆名並同步更新該作者作品顯示筆名
   async function savePenname() {
     const newPen = document.getElementById("penname-input").value.trim();
     if (!newPen) return alert("筆名不能為空！");
@@ -485,7 +488,6 @@
     document.getElementById(id).classList.remove("hidden");
   }
 
-  // 首頁僅顯示作品卡片與「進入作品」
   function renderNovelList() {
     const listEl = document.getElementById("novel-list");
     if (!Array.isArray(novelsData) || novelsData.length === 0) {
@@ -512,7 +514,6 @@
     }).join("");
   }
 
-  // 進入單一作品畫面（在此才能按「編輯」與「新增篇章」）
   function openNovelDetail(novelId) {
     const novel = novelsData.find(n => n.id === novelId);
     if (!novel) return;
@@ -592,17 +593,17 @@
 
     const newTitle = document.getElementById("edit-novel-title-input").value.trim();
     const newDesc = document.getElementById("edit-novel-desc-input").value.trim();
-    if (!newTitle) return alert("作品名稱不能為空！");
+    if (!newTitle) return alert("作品標題不能為空！");
 
     await loadAllData();
     const target = novelsData.find(n => n.id === currentNovelId);
     if (target) {
       target.title = newTitle;
       target.description = newDesc;
-      novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Edit novel ${newTitle}`);
+      novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Edit novel title & desc: ${newTitle}`);
     }
 
-    alert("作品資訊已更新！");
+    alert("作品標題與簡介已更新！");
     renderNovelList();
     openNovelDetail(currentNovelId);
   }
@@ -678,7 +679,6 @@
     openNovelDetail(currentNovelId);
   }
 
-  // 核心分頁演算法：約 20 行一頁
   function paginateText(text) {
     const rawParagraphs = text.split("\n");
     const visualLines = [];
@@ -702,7 +702,6 @@
     return pages.length > 0 ? pages : ["（本章節尚無內容）"];
   }
 
-  // 開啟閱讀器
   function openReader(novelId, chapterIdx, startPage = 0) {
     activeNovel = novelsData.find(n => n.id === novelId);
     if (!activeNovel || !activeNovel.chapters[chapterIdx]) return;
@@ -720,7 +719,6 @@
     showSection("reader-section");
   }
 
-  // 更新閱讀頁面並自動儲存進度至 password.json
   async function updateReaderView() {
     document.getElementById("reader-content").innerText = paginatedPages[currentPage];
     document.getElementById("page-indicator").innerText = `第 ${currentPage + 1} / ${paginatedPages.length} 頁`;
@@ -750,7 +748,6 @@
     }
   }
 
-  // 點擊「建立新書」按鈕
   async function handleCreateNovelClick() {
     if (currentUser.canCreate || isOwnerAccount(currentUser.username)) {
       showSection("editor-section");
@@ -793,7 +790,6 @@
     openNovelDetail(newId);
   }
 
-  // 管理員審核列表
   function renderApplicants() {
     const list = document.getElementById("applicant-list");
     const applicants = usersData.filter(u => u.appliedCreator && !u.canCreate);
