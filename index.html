@@ -173,17 +173,19 @@
     return result.content.sha;
   }
 
-  // 初始化載入資料
+  // 初始化載入資料（加上防呆，確保永遠是陣列）
   async function loadAllData() {
     try {
       const uRes = await fetchGitHubFile("password.json");
-      usersData = uRes.json;
+      usersData = Array.isArray(uRes.json) ? uRes.json : [];
       usersSha = uRes.sha;
 
       const nRes = await fetchGitHubFile("novels.json");
-      novelsData = nRes.json;
+      novelsData = Array.isArray(nRes.json) ? nRes.json : [];
       novelsSha = nRes.sha;
     } catch (e) {
+      usersData = Array.isArray(usersData) ? usersData : [];
+      novelsData = Array.isArray(novelsData) ? novelsData : [];
       alert("讀取資料庫失敗：\n" + e.message);
       console.error(e);
     }
@@ -192,7 +194,7 @@
   window.onload = async () => {
     await loadAllData();
     const savedUser = localStorage.getItem("novel_logged_user");
-    if (savedUser) {
+    if (savedUser && Array.isArray(usersData)) {
       const found = usersData.find(u => u.username === savedUser);
       if (found) enterSystem(found);
     }
@@ -257,6 +259,7 @@
 
     try {
       await loadAllData();
+      if (!Array.isArray(usersData)) usersData = [];
 
       if (username === CONFIG.OWNER_USER && password === CONFIG.OWNER_PASS) {
         let ownerUser = usersData.find(u => u.username === CONFIG.OWNER_USER);
@@ -306,6 +309,7 @@
 
   function enterSystem(user) {
     currentUser = user;
+    currentUser.progress = currentUser.progress || {};
     document.getElementById("auth-section").classList.add("hidden");
     document.getElementById("nav-buttons").classList.remove("hidden");
     const badge = document.getElementById("user-badge");
