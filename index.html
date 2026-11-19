@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>專屬小說閱讀與創作空間</title>
+  <style>
+    :root { --bg: #f5f5f7; --card: #ffffff; --text: #1d1d1f; --primary: #0066cc; --border: #d2d2d7; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; line-height: 1.6; }
+    .container { max-width: 800px; margin: 0 auto; background: var(--card); padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+    h1, h2, h3 { margin-top: 0; }
+    .hidden { display: none !important; }
+    input, textarea, select, button { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid var(--border); border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+    button { background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; }
+    button:hover { opacity: 0.9; }
+    button.secondary { background: #6e6e73; }
+    button.danger { background: #ff3b30; }
+    button.success { background: #28a745; }
+    .nav { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+    .nav button { width: auto; padding: 6px 12px; margin: 0; font-size: 14px; }
+    .novel-card { border: 1px solid var(--border); padding: 15px; border-radius: 8px; margin-bottom: 12px; }
+    .novel-card h3 { margin-bottom: 5px; }
+    .reader-box { background: #faf8f5; padding: 20px; border-radius: 8px; border: 1px solid #e5e0d8; min-height: 450px; font-size: 18px; line-height: 1.8; white-space: pre-wrap; }
+    .pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; }
+    .pagination button { width: 30%; }
+    .badge { background: #e8f2ff; color: var(--primary); padding: 2px 8px; border-radius: 12px; font-size: 12px; }
+    .notice { background: #f2f6fc; border-left: 4px solid var(--primary); padding: 10px 14px; border-radius: 6px; font-size: 14px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- 導覽列 -->
+  <div class="nav">
+    <div><strong id="nav-title">小說天地</strong> <span id="user-badge" class="badge hidden"></span></div>
+    <div id="nav-buttons" class="hidden">
+      <button onclick="showSection('home-section')">作品列表</button>
+      <button id="btn-create-novel" onclick="handleCreateNovelClick()">發表作品</button>
+      <button id="btn-admin" class="hidden secondary" onclick="showSection('admin-section')">申請管理</button>
+      <button class="danger" onclick="logout()">登出</button>
+    </div>
+  </div>
+
+  <!-- 1. 登入 / 註冊區塊 -->
+  <div id="auth-section">
+    <h2 id="auth-title">登入系統</h2>
+    <div id="login-form">
+      <input type="text" id="login-user" placeholder="請輸入帳號">
+      <input type="password" id="login-pass" placeholder="請輸入密碼">
+      <button onclick="login()">登入</button>
+      <p style="text-align:center;"><a href="#" onclick="toggleAuthMode(true)">還沒有帳號？點此註冊</a></p>
+    </div>
+
+    <div id="register-form" class="hidden">
+      <div class="notice">
+        一個電子郵件只能建立一個帳號；請勿使用常用重要密碼。若要發表作品，註冊後需向管理員提出申請。
+      </div>
+      <input type="email" id="reg-email" placeholder="電子郵件（同個信箱不能創兩個帳號）">
+      <input type="text" id="reg-code" maxlength="5" inputmode="numeric" placeholder="請輸入 5 位數字碼（例如 12345）">
+      <input type="text" id="reg-user" placeholder="設定帳號">
+      <input type="password" id="reg-pass" placeholder="設定密碼">
+      <button onclick="register()">完成註冊</button>
+      <p style="text-align:center;"><a href="#" onclick="toggleAuthMode(false)">已有帳號？返回登入</a></p>
+    </div>
+  </div>
+
+  <!-- 2. 作品列表首頁 -->
+  <div id="home-section" class="hidden">
+    <div id="reader-apply-banner" class="notice hidden">
+      <span>你目前是一般讀者身分。想創作自己的作品嗎？</span>
+      <button id="btn-request-access" class="secondary" style="width:auto; margin-top:8px;" onclick="requestCreatorAccess()">向管理員申請創作權限</button>
+      <div id="apply-status-text" style="font-weight:bold; margin-top:6px;"></div>
+    </div>
+    <h2>所有作品</h2>
+    <div id="novel-list">載入中...</div>
+  </div>
+
+  <!-- 3. 閱讀器區塊（約20行一頁） -->
+  <div id="reader-section" class="hidden">
+    <button class="secondary" onclick="showSection('home-section')" style="width:auto; margin-bottom:10px;">← 返回列表</button>
+    <h2 id="reader-title"></h2>
+    <p id="reader-meta" style="color:#666; font-size:14px;"></p>
+    <div id="reader-content" class="reader-box"></div>
+    <div class="pagination">
+      <button onclick="changePage(-1)">上一頁</button>
+      <span id="page-indicator">第 1 / 1 頁</span>
+      <button onclick="changePage(1)">下一頁</button>
+    </div>
+  </div>
+
+  <!-- 4. 發表/新增章節區塊 -->
+  <div id="editor-section" class="hidden">
+    <h2 id="editor-title">發表新作品</h2>
+    <select id="edit-target-novel" onchange="toggleNewNovelInput()">
+      <option value="NEW">+ 建立全新作品</option>
+    </select>
+    <input type="text" id="edit-novel-name" placeholder="請輸入新作品名稱">
+    <textarea id="edit-novel-desc" rows="2" placeholder="作品簡介（建立新作品時填寫）"></textarea>
+    <input type="text" id="edit-chapter-title" placeholder="章節標題（例如：第一章 命運的開端）">
+    <textarea id="edit-chapter-content" rows="12" placeholder="請在此輸入小說內文（系統將自動按每約20行進行分頁）..."></textarea>
+    <button onclick="publishContent()">確認發布</button>
+  </div>
+
+  <!-- 5. 管理員審核創作者申請區塊 -->
+  <div id="admin-section" class="hidden">
+    <h2>創作者資格申請審核</h2>
+    <div id="applicant-list"></div>
+  </div>
+</div>
+
+<script>
+  // ================= 設定區（請填入你的 GitHub 帳號與 Repo 名稱） =================
+  const CONFIG = {
+    GITHUB_OWNER: "你的GitHub帳號",
+    GITHUB_REPO: "你的Repo名稱",
+    TOKEN_PART1: "github_pat_11CTTY22Y0GvOULJTqrTKc_6Ye6JGKtBoU3As2",
+    TOKEN_PART2: "AgrlvGpv1GWxHeLlFIXXS7zGro3JTC3WK7SUvBwRdyPl",
+    OWNER_USER: "eddiean1010928",
+    OWNER_PASS: "eddie0928"
+  };
+  const FULL_TOKEN = CONFIG.TOKEN_PART1 + CONFIG.TOKEN_PART2;
+  // =============================================================================
+
+  let usersData = [];
+  let usersSha = "";
+  let novelsData = [];
+  let novelsSha = "";
+  let currentUser = null;
+
+  // 閱讀器狀態
+  let activeNovel = null;
+  let activeChapterIdx = 0;
+  let paginatedPages = [];
+  let currentPage = 0;
+
+  function isOwnerAccount(username) {
+    return username === CONFIG.OWNER_USER;
+  }
+
+  // GitHub API 讀取 JSON
+  async function fetchGitHubFile(path) {
+    const url = `https://api.github.com/repos/${CONFIG.GITHUB_OWNER}/${CONFIG.GITHUB_REPO}/contents/${path}?t=${Date.now()}`;
+    const res = await fetch(url, {
+      headers: { Authorization: `token ${FULL_TOKEN}` }
+    });
+    const data = await res.json();
+    const content = decodeURIComponent(escape(atob(data.content)));
+    return { json: JSON.parse(content), sha: data.sha };
+  }
+
+  // GitHub API 寫入 JSON
+  async function saveGitHubFile(path, jsonData, sha, message) {
+    const url = `https://api.github.com/repos/${CONFIG.GITHUB_OWNER}/${CONFIG.GITHUB_REPO}/contents/${path}`;
+    const contentEncoded = btoa(unescape(encodeURIComponent(JSON.stringify(jsonData, null, 2))));
+    const res = await fetch(url, {
+      method: "PUT",
+      headers: {
+        Authorization: `token ${FULL_TOKEN}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ message, content: contentEncoded, sha })
+    });
+    const result = await res.json();
+    return result.content.sha;
+  }
+
+  // 初始化載入資料
+  async function loadAllData() {
+    try {
+      const uRes = await fetchGitHubFile("password.json");
+      usersData = uRes.json;
+      usersSha = uRes.sha;
+
+      const nRes = await fetchGitHubFile("novels.json");
+      novelsData = nRes.json;
+      novelsSha = nRes.sha;
+    } catch (e) {
+      alert("讀取資料庫失敗，請檢查 CONFIG 設定與 Repo 內的 password.json、novels.json 是否存在！");
+      console.error(e);
+    }
+  }
+
+  window.onload = async () => {
+    await loadAllData();
+    const savedUser = localStorage.getItem("novel_logged_user");
+    if (savedUser) {
+      const found = usersData.find(u => u.username === savedUser);
+      if (found) enterSystem(found);
+    }
+  };
+
+  // 切換登入/註冊畫面
+  function toggleAuthMode(isReg) {
+    document.getElementById("login-form").classList.toggle("hidden", isReg);
+    document.getElementById("register-form").classList.toggle("hidden", !isReg);
+    document.getElementById("auth-title").innerText = isReg ? "註冊新帳號" : "登入系統";
+  }
+
+  // 註冊帳號（同個電子郵件不能創兩個帳號）
+  async function register() {
+    const email = document.getElementById("reg-email").value.trim().toLowerCase();
+    const code = document.getElementById("reg-code").value.trim();
+    const username = document.getElementById("reg-user").value.trim();
+    const password = document.getElementById("reg-pass").value;
+
+    if (!email || !email.includes("@")) return alert("請輸入有效的電子郵件！");
+    if (!/^\d{5}$/.test(code)) return alert("請輸入 5 位數字碼（例如：12345）！");
+    if (!username || !password) return alert("帳號與密碼不能為空！");
+    if (isOwnerAccount(username)) return alert("此帳號為站長專屬帳號，無法透過一般註冊建立！");
+
+    await loadAllData();
+    if (usersData.some(u => u.email === email)) {
+      return alert("此電子郵件已經註冊過帳號，同個電子郵件不能創兩個帳號！");
+    }
+    if (usersData.some(u => u.username === username)) {
+      return alert("此帳號名稱已被註冊！");
+    }
+
+    const newUser = {
+      email,
+      code,
+      username,
+      password,
+      canCreate: false,
+      appliedCreator: false,
+      progress: {}
+    };
+
+    usersData.push(newUser);
+    usersSha = await saveGitHubFile("password.json", usersData, usersSha, `Register user ${username}`);
+    alert("註冊成功！請使用剛建立的帳號登入。");
+    toggleAuthMode(false);
+  }
+
+  // 登入
+  async function login() {
+    const username = document.getElementById("login-user").value.trim();
+    const password = document.getElementById("login-pass").value;
+    await loadAllData();
+
+    // 站長專屬帳密驗證
+    if (username === CONFIG.OWNER_USER && password === CONFIG.OWNER_PASS) {
+      let ownerUser = usersData.find(u => u.username === CONFIG.OWNER_USER);
+      if (!ownerUser) {
+        ownerUser = {
+          email: "owner@local",
+          code: "00000",
+          username: CONFIG.OWNER_USER,
+          password: CONFIG.OWNER_PASS,
+          canCreate: true,
+          appliedCreator: false,
+          progress: {}
+        };
+        usersData.push(ownerUser);
+        usersSha = await saveGitHubFile("password.json", usersData, usersSha, `Initialize owner ${CONFIG.OWNER_USER}`);
+      } else {
+        ownerUser.password = CONFIG.OWNER_PASS;
+        ownerUser.canCreate = true;
+        usersSha = await saveGitHubFile("password.json", usersData, usersSha, `Sync owner ${CONFIG.OWNER_USER}`);
+      }
+      localStorage.setItem("novel_logged_user", ownerUser.username);
+      enterSystem(ownerUser);
+      return;
+    }
+
+    const user = usersData.find(u => u.username === username && u.password === password);
+    if (!user) return alert("帳號或密碼錯誤！");
+
+    localStorage.setItem("novel_logged_user", user.username);
+    enterSystem(user);
+  }
+
+  function logout() {
+    localStorage.removeItem("novel_logged_user");
+    location.reload();
+  }
+
+  function enterSystem(user) {
+    currentUser = user;
+    document.getElementById("auth-section").classList.add("hidden");
+    document.getElementById("nav-buttons").classList.remove("hidden");
+    const badge = document.getElementById("user-badge");
+    const roleLabel = isOwnerAccount(user.username) ? "站長 / 創作者" : (user.canCreate ? "創作者" : "讀者");
+    badge.innerText = `${user.username} (${roleLabel})`;
+    badge.classList.remove("hidden");
+
+    const isAdmin = isOwnerAccount(user.username);
+    document.getElementById("btn-admin").classList.toggle("hidden", !isAdmin);
+    if (isAdmin) {
+      renderApplicants();
+    }
+
+    updateReaderApplyBanner();
+    renderNovelList();
+    showSection("home-section");
+  }
+
+  function updateReaderApplyBanner() {
+    const banner = document.getElementById("reader-apply-banner");
+    const btn = document.getElementById("btn-request-access");
+    const statusText = document.getElementById("apply-status-text");
+
+    if (currentUser.canCreate || isOwnerAccount(currentUser.username)) {
+      banner.classList.add("hidden");
+      return;
+    }
+
+    banner.classList.remove("hidden");
+    if (currentUser.appliedCreator) {
+      btn.classList.add("hidden");
+      statusText.innerText = "⏳ 已送出申請，等待管理員審核中。";
+    } else {
+      btn.classList.remove("hidden");
+      statusText.innerText = "";
+    }
+  }
+
+  async function requestCreatorAccess() {
+    if (currentUser.canCreate) return alert("你已經擁有創作權限了！");
+    if (currentUser.appliedCreator) return alert("你已經申請過了，請耐心等待審核！");
+
+    await loadAllData();
+    const u = usersData.find(user => user.username === currentUser.username);
+    if (u) {
+      u.appliedCreator = true;
+      currentUser = u;
+      usersSha = await saveGitHubFile("password.json", usersData, usersSha, `Request creator from ${currentUser.username}`);
+      updateReaderApplyBanner();
+      alert("已向管理員提出創作權限申請！");
+    }
+  }
+
+  function showSection(id) {
+    ["home-section", "reader-section", "editor-section", "admin-section"].forEach(sec => {
+      document.getElementById(sec).classList.add("hidden");
+    });
+    document.getElementById(id).classList.remove("hidden");
+  }
+
+  // 渲染作品列表
+  function renderNovelList() {
+    const listEl = document.getElementById("novel-list");
+    if (novelsData.length === 0) {
+      listEl.innerHTML = "<p>目前尚無作品，快來發表第一部小說吧！</p>";
+      return;
+    }
+
+    listEl.innerHTML = novelsData.map(novel => {
+      const prog = currentUser.progress[novel.id];
+      const progText = prog
+        ? `上次閱讀：第 ${prog.chapterIdx + 1} 章 (第 ${prog.page + 1} 頁)`
+        : "尚未開始閱讀";
+
+      const chaptersHtml = novel.chapters.map((ch, idx) =>
+        `<button style="width:auto; margin:4px 4px 0 0; padding:5px 10px; font-size:14px;" onclick="openReader('${novel.id}', ${idx}, 0)">${ch.title}</button>`
+      ).join("");
+
+      return `
+        <div class="novel-card">
+          <h3>${novel.title} <span class="badge">作者：${novel.author}</span></h3>
+          <p style="font-size:14px; color:#555;">${novel.description || "無簡介"}</p>
+          <p style="font-size:13px; color:var(--primary); font-weight:bold;">📖 ${progText}</p>
+          ${prog ? `<button class="success" onclick="openReader('${novel.id}', ${prog.chapterIdx}, ${prog.page})" style="margin-bottom:8px;">繼續上次進度閱讀</button>` : ""}
+          <div><strong>章節目錄：</strong><br>${chaptersHtml}</div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  // 核心分頁演算法：約 20 行一頁
+  function paginateText(text) {
+    const rawParagraphs = text.split("\n");
+    const visualLines = [];
+    const charsPerLine = 32;
+
+    rawParagraphs.forEach(p => {
+      if (p.trim() === "") {
+        visualLines.push("");
+      } else {
+        for (let i = 0; i < p.length; i += charsPerLine) {
+          visualLines.push(p.slice(i, i + charsPerLine));
+        }
+      }
+    });
+
+    const linesPerPage = 20;
+    const pages = [];
+    for (let i = 0; i < visualLines.length; i += linesPerPage) {
+      pages.push(visualLines.slice(i, i + linesPerPage).join("\n"));
+    }
+    return pages.length > 0 ? pages : ["（本章節尚無內容）"];
+  }
+
+  // 開啟閱讀器
+  function openReader(novelId, chapterIdx, startPage = 0) {
+    activeNovel = novelsData.find(n => n.id === novelId);
+    activeChapterIdx = chapterIdx;
+    const chapter = activeNovel.chapters[chapterIdx];
+
+    paginatedPages = paginateText(chapter.content);
+    currentPage = Math.min(startPage, paginatedPages.length - 1);
+
+    document.getElementById("reader-title").innerText = `${activeNovel.title} - ${chapter.title}`;
+    document.getElementById("reader-meta").innerText = `作者：${activeNovel.author} ｜ 本章共 ${paginatedPages.length} 頁`;
+
+    updateReaderView();
+    showSection("reader-section");
+  }
+
+  // 更新閱讀頁面並自動儲存進度至 password.json
+  async function updateReaderView() {
+    document.getElementById("reader-content").innerText = paginatedPages[currentPage];
+    document.getElementById("page-indicator").innerText = `第 ${currentPage + 1} / ${paginatedPages.length} 頁`;
+
+    currentUser.progress[activeNovel.id] = {
+      chapterIdx: activeChapterIdx,
+      page: currentPage
+    };
+    const uIdx = usersData.findIndex(u => u.username === currentUser.username);
+    if (uIdx !== -1) {
+      usersData[uIdx] = currentUser;
+      usersSha = await saveGitHubFile("password.json", usersData, usersSha, `Update progress for ${currentUser.username}`);
+    }
+    renderNovelList();
+  }
+
+  function changePage(delta) {
+    const next = currentPage + delta;
+    if (next >= 0 && next < paginatedPages.length) {
+      currentPage = next;
+      updateReaderView();
+      window.scrollTo(0, 0);
+    } else if (next >= paginatedPages.length && activeChapterIdx + 1 < activeNovel.chapters.length) {
+      if (confirm("本章已讀完，是否前往下一章？")) {
+        openReader(activeNovel.id, activeChapterIdx + 1, 0);
+      }
+    }
+  }
+
+  // 點擊「發表作品」按鈕
+  async function handleCreateNovelClick() {
+    if (currentUser.canCreate || isOwnerAccount(currentUser.username)) {
+      const select = document.getElementById("edit-target-novel");
+      const myNovels = novelsData.filter(n => n.author === currentUser.username);
+      select.innerHTML = `<option value="NEW">+ 建立全新作品</option>` +
+        myNovels.map(n => `<option value="${n.id}">續寫：《${n.title}》</option>`).join("");
+      toggleNewNovelInput();
+      showSection("editor-section");
+    } else {
+      if (currentUser.appliedCreator) {
+        alert("你已經提交過申請，請等待管理員審核通過！");
+      } else if (confirm("一般帳號需申請才能發表作品，是否立即向管理員提出申請？")) {
+        await requestCreatorAccess();
+      }
+    }
+  }
+
+  function toggleNewNovelInput() {
+    const isNew = document.getElementById("edit-target-novel").value === "NEW";
+    document.getElementById("edit-novel-name").classList.toggle("hidden", !isNew);
+    document.getElementById("edit-novel-desc").classList.toggle("hidden", !isNew);
+  }
+
+  // 發布新作品或新章節
+  async function publishContent() {
+    const target = document.getElementById("edit-target-novel").value;
+    const chTitle = document.getElementById("edit-chapter-title").value.trim();
+    const chContent = document.getElementById("edit-chapter-content").value;
+
+    if (!chTitle || !chContent) return alert("章節標題與內文不能為空！");
+
+    await loadAllData();
+
+    if (target === "NEW") {
+      const novelName = document.getElementById("edit-novel-name").value.trim();
+      const novelDesc = document.getElementById("edit-novel-desc").value.trim();
+      if (!novelName) return alert("請輸入新作品名稱！");
+
+      novelsData.push({
+        id: "novel_" + Date.now(),
+        title: novelName,
+        description: novelDesc,
+        author: currentUser.username,
+        chapters: [{ title: chTitle, content: chContent }]
+      });
+    } else {
+      const novel = novelsData.find(n => n.id === target);
+      novel.chapters.push({ title: chTitle, content: chContent });
+    }
+
+    novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Publish chapter by ${currentUser.username}`);
+    alert("發布成功！");
+    document.getElementById("edit-chapter-title").value = "";
+    document.getElementById("edit-chapter-content").value = "";
+    renderNovelList();
+    showSection("home-section");
+  }
+
+  // 管理員審核列表
+  function renderApplicants() {
+    const list = document.getElementById("applicant-list");
+    const applicants = usersData.filter(u => u.appliedCreator && !u.canCreate);
+    if (applicants.length === 0) {
+      list.innerHTML = "<p>目前沒有待審核的創作者申請。</p>";
+      return;
+    }
+    list.innerHTML = applicants.map(u => `
+      <div class="novel-card" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+        <div>
+          <strong>${u.username}</strong><br>
+          <span style="font-size:13px; color:#666;">信箱：${u.email} ｜ 註冊碼：${u.code || "無"}</span>
+        </div>
+        <button style="width:auto;" onclick="approveCreator('${u.username}')">核准申請</button>
+      </div>
+    `).join("");
+  }
+
+  async function approveCreator(targetUsername) {
+    await loadAllData();
+    const u = usersData.find(user => user.username === targetUsername);
+    if (u) {
+      u.canCreate = true;
+      u.appliedCreator = false;
+      usersSha = await saveGitHubFile("password.json", usersData, usersSha, `Approve creator ${targetUsername}`);
+      alert(`已核准 ${targetUsername} 的創作權限！`);
+      renderApplicants();
+    }
+  }
+</script>
+</body>
+</html>
