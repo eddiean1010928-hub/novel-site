@@ -13,6 +13,7 @@
     input, textarea, select, button { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid var(--border); border-radius: 8px; box-sizing: border-box; font-size: 16px; }
     button { background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; }
     button:hover { opacity: 0.9; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
     button.secondary { background: #6e6e73; }
     button.danger { background: #ff3b30; }
     button.success { background: #28a745; }
@@ -242,39 +243,60 @@
 
   // 登入
   async function login() {
+    const btn = document.querySelector("#login-form button");
     const username = document.getElementById("login-user").value.trim();
     const password = document.getElementById("login-pass").value;
-    await loadAllData();
 
-    if (username === CONFIG.OWNER_USER && password === CONFIG.OWNER_PASS) {
-      let ownerUser = usersData.find(u => u.username === CONFIG.OWNER_USER);
-      if (!ownerUser) {
-        ownerUser = {
-          email: "owner@local",
-          code: "00000",
-          username: CONFIG.OWNER_USER,
-          password: CONFIG.OWNER_PASS,
-          canCreate: true,
-          appliedCreator: false,
-          progress: {}
-        };
-        usersData.push(ownerUser);
-        usersSha = await saveGitHubFile("password.json", usersData, usersSha, `Initialize owner ${CONFIG.OWNER_USER}`);
-      } else {
-        ownerUser.password = CONFIG.OWNER_PASS;
-        ownerUser.canCreate = true;
-        usersSha = await saveGitHubFile("password.json", usersData, usersSha, `Sync owner ${CONFIG.OWNER_USER}`);
-      }
-      localStorage.setItem("novel_logged_user", ownerUser.username);
-      enterSystem(ownerUser);
+    if (!username || !password) {
+      alert("請輸入帳號與密碼！");
       return;
     }
 
-    const user = usersData.find(u => u.username === username && u.password === password);
-    if (!user) return alert("帳號或密碼錯誤！");
+    btn.disabled = true;
+    btn.innerText = "登入中...";
 
-    localStorage.setItem("novel_logged_user", user.username);
-    enterSystem(user);
+    try {
+      await loadAllData();
+
+      if (username === CONFIG.OWNER_USER && password === CONFIG.OWNER_PASS) {
+        let ownerUser = usersData.find(u => u.username === CONFIG.OWNER_USER);
+        if (!ownerUser) {
+          ownerUser = {
+            email: "owner@local",
+            code: "00000",
+            username: CONFIG.OWNER_USER,
+            password: CONFIG.OWNER_PASS,
+            canCreate: true,
+            appliedCreator: false,
+            progress: {}
+          };
+          usersData.push(ownerUser);
+          usersSha = await saveGitHubFile("password.json", usersData, usersSha, `Initialize owner ${CONFIG.OWNER_USER}`);
+        } else if (ownerUser.password !== CONFIG.OWNER_PASS || !ownerUser.canCreate) {
+          ownerUser.password = CONFIG.OWNER_PASS;
+          ownerUser.canCreate = true;
+          usersSha = await saveGitHubFile("password.json", usersData, usersSha, `Sync owner ${CONFIG.OWNER_USER}`);
+        }
+        localStorage.setItem("novel_logged_user", ownerUser.username);
+        enterSystem(ownerUser);
+        return;
+      }
+
+      const user = usersData.find(u => u.username === username && u.password === password);
+      if (!user) {
+        alert("帳號或密碼錯誤！");
+        return;
+      }
+
+      localStorage.setItem("novel_logged_user", user.username);
+      enterSystem(user);
+    } catch (err) {
+      alert("登入過程發生錯誤：\n" + err.message);
+      console.error(err);
+    } finally {
+      btn.disabled = false;
+      btn.innerText = "登入";
+    }
   }
 
   function logout() {
