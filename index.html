@@ -24,11 +24,21 @@
     .novel-card h3 { margin-bottom: 5px; }
     .chapter-row { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ececef; padding: 8px 0; gap: 8px; flex-wrap: wrap; }
 
+    /* 評分星星 */
+    .rating-box { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+    .star-btn { width: auto; padding: 4px 8px; margin: 0; font-size: 18px; background: #f2f2f7; color: #b0b0b8; border: 1px solid var(--border); border-radius: 6px; }
+    .star-btn.active { background: #fff8e1; color: #f5a623; border-color: #f5a623; }
+
+    /* 公開留言區 */
+    .comment-item { background: #f8f9fa; border: 1px solid #e5e5ea; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+    .comment-meta { font-size: 12px; color: #666; margin-bottom: 4px; }
+
     /* 字體大小控制列 */
-    .font-toolbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; background: #f2f2f7; padding: 8px 12px; border-radius: 8px; }
+    .font-toolbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; background: #f2f2f7; padding: 8px 12px; border-radius: 8px; }
     .font-toolbar span { font-size: 13px; color: #555; margin-right: 4px; }
     .font-btn { width: auto; padding: 4px 10px; margin: 0; font-size: 13px; background: #ffffff; color: var(--text); border: 1px solid var(--border); font-weight: normal; }
     .font-btn.active { background: var(--primary); color: #ffffff; border-color: var(--primary); font-weight: bold; }
+    .layout-tag { font-size: 12px; color: #0066cc; background: #e8f2ff; padding: 4px 10px; border-radius: 6px; display: inline-block; margin-bottom: 10px; }
 
     /* 閱讀器容器與翻頁動畫 */
     .reader-viewport { overflow: hidden; border-radius: 8px; }
@@ -38,13 +48,18 @@
       border-radius: 8px;
       border: 1px solid #e5e0d8;
       min-height: 440px;
-      font-size: 15px; /* 預設最小字體，貼近備忘錄閱讀比例 */
+      font-size: 13px;
       line-height: 1.75;
       white-space: pre-wrap;
       word-break: break-word;
-      transition: transform 0.22s ease, opacity 0.22s ease, font-size 0.15s ease;
+      transition: transform 0.22s ease, opacity 0.22s ease, font-size 0.15s ease, max-width 0.15s ease;
       transform: translateX(0);
       opacity: 1;
+    }
+    .reader-box.mode-xsmall25 {
+      font-size: 13px;
+      max-width: 27.5em; /* 約 25 字一行寬度 */
+      margin: 0 auto;
     }
     .reader-box.slide-out-left { transform: translateX(-32px); opacity: 0; }
     .reader-box.slide-out-right { transform: translateX(32px); opacity: 0; }
@@ -67,7 +82,7 @@
     <div id="nav-buttons" class="hidden">
       <button onclick="showSection('home-section')">作品列表</button>
       <button id="btn-create-novel" onclick="handleCreateNovelClick()">建立新書</button>
-      <button id="btn-admin" class="hidden secondary" onclick="showSection('admin-section')">申請管理</button>
+      <button id="btn-admin" class="hidden secondary" onclick="showSection('admin-section')">會員與申請管理</button>
       <button class="danger" onclick="logout()">登出</button>
     </div>
   </div>
@@ -84,9 +99,10 @@
 
     <div id="register-form" class="hidden">
       <div class="notice">
-        一個電子郵件只能建立一個帳號；請勿使用常用重要密碼。註冊後即可直接登入閱讀；若要發表作品與設定筆名，需向管理員申請創作權限。
+        一個電子郵件只能建立一個帳號；請勿使用常用重要密碼。註冊後即可直接登入閱讀與留言評分；若要發表作品與設定筆名，需向管理員申請創作權限。
       </div>
       <input type="email" id="reg-email" placeholder="電子郵件（同個信箱不能創兩個帳號）">
+      <input type="text" id="reg-nickname" placeholder="暱稱（大家看到的名稱，未填則同帳號）">
       <input type="text" id="reg-user" placeholder="設定帳號">
       <input type="password" id="reg-pass" placeholder="設定密碼">
       <button onclick="register()">完成註冊</button>
@@ -119,8 +135,25 @@
     <button class="secondary small" onclick="showSection('home-section')">← 返回作品列表</button>
     <h2 id="detail-title"></h2>
     <p id="detail-author" style="color:var(--primary); font-weight:bold; margin:4px 0;"></p>
-    <p id="detail-desc" style="color:#555; white-space:pre-wrap;"></p>
-    <p id="detail-progress" style="font-size:14px; font-weight:bold;"></p>
+    <p id="detail-rating-summary" style="font-size:14px; font-weight:bold; margin:6px 0;"></p>
+
+    <!-- 作品評分（滿分 5 顆星） -->
+    <div class="rating-box">
+      <span style="font-size:14px;">你的評分（滿分 5 ⭐）：</span>
+      <button type="button" class="star-btn" data-star="1" onclick="rateNovel(1)">★</button>
+      <button type="button" class="star-btn" data-star="2" onclick="rateNovel(2)">★</button>
+      <button type="button" class="star-btn" data-star="3" onclick="rateNovel(3)">★</button>
+      <button type="button" class="star-btn" data-star="4" onclick="rateNovel(4)">★</button>
+      <button type="button" class="star-btn" data-star="5" onclick="rateNovel(5)">★</button>
+      <span id="user-rating-label" style="font-size:13px; color:#666;"></span>
+    </div>
+
+    <div class="panel">
+      <strong>作品簡介</strong>
+      <p id="detail-desc" style="color:#555; white-space:pre-wrap; margin:6px 0 0 0;"></p>
+    </div>
+
+    <p id="detail-progress" style="font-size:14px; font-weight:bold; margin-top:12px;"></p>
     <button id="btn-detail-continue" class="success hidden" onclick="continueActiveNovel()">繼續上次進度閱讀</button>
 
     <div id="author-novel-actions" class="hidden" style="margin-top:10px;">
@@ -159,6 +192,14 @@
 
     <h3 style="margin-top:20px;">篇章列表</h3>
     <div id="detail-chapter-list"></div>
+
+    <!-- 公開留言區（在作品簡介下方，所有人都看得到） -->
+    <div class="panel" style="margin-top:22px;">
+      <h3>💬 作品留言區（大家皆可見）</h3>
+      <textarea id="comment-input" rows="2" placeholder="寫下你對這部作品的想法或留言..."></textarea>
+      <button class="small" onclick="submitComment()">送出留言</button>
+      <div id="comment-list" style="margin-top:12px;"></div>
+    </div>
   </div>
 
   <!-- 4. 建立新作品畫面 -->
@@ -172,22 +213,25 @@
     <button onclick="publishNewNovel()">建立並發布</button>
   </div>
 
-  <!-- 5. 閱讀器區塊（字體大小控制＋翻頁滑動動畫） -->
+  <!-- 5. 閱讀器區塊 -->
   <div id="reader-section" class="hidden">
     <button class="secondary small" onclick="backToNovelDetail()">← 回到作品畫面</button>
     <h2 id="reader-title"></h2>
-    <p id="reader-meta" style="color:#666; font-size:14px;"></p>
+    <p id="reader-meta" style="color:#666; font-size:14px; margin-bottom:6px;"></p>
 
     <div class="font-toolbar">
       <span>字體大小：</span>
-      <button type="button" class="font-btn active" data-size="15" onclick="setReaderFontSize(15)">小（預設）</button>
-      <button type="button" class="font-btn" data-size="17" onclick="setReaderFontSize(17)">中</button>
-      <button type="button" class="font-btn" data-size="19" onclick="setReaderFontSize(19)">大</button>
-      <button type="button" class="font-btn" data-size="21" onclick="setReaderFontSize(21)">特大</button>
+      <button type="button" class="font-btn active" data-mode="xsmall25" onclick="setReaderFontMode('xsmall25')">特小（25字/行）</button>
+      <button type="button" class="font-btn" data-mode="small" onclick="setReaderFontMode('small')">小</button>
+      <button type="button" class="font-btn" data-mode="medium" onclick="setReaderFontMode('medium')">中</button>
+      <button type="button" class="font-btn" data-mode="large" onclick="setReaderFontMode('large')">大</button>
+      <button type="button" class="font-btn" data-mode="xlarge" onclick="setReaderFontMode('xlarge')">特大</button>
     </div>
 
+    <div id="layout-notice" class="layout-tag">📌 依原作編排顯示（特小字 · 每行約 25 字）</div>
+
     <div class="reader-viewport">
-      <div id="reader-content" class="reader-box"></div>
+      <div id="reader-content" class="reader-box mode-xsmall25"></div>
     </div>
 
     <div class="pagination">
@@ -197,10 +241,13 @@
     </div>
   </div>
 
-  <!-- 6. 管理員審核創作者申請區塊 -->
+  <!-- 6. 管理員面板（創作者申請審核 ＋ 所有會員帳號列表） -->
   <div id="admin-section" class="hidden">
     <h2>創作者資格申請審核</h2>
     <div id="applicant-list"></div>
+
+    <h2 style="margin-top:24px;">所有註冊會員帳號總覽</h2>
+    <div id="all-users-list"></div>
   </div>
 </div>
 
@@ -232,17 +279,32 @@
   let currentPage = 0;
   let isAnimatingPage = false;
 
-  // 字體大小系統（預設最小 15px）
-  function setReaderFontSize(size) {
-    const validSizes = [15, 17, 19, 21];
-    const targetSize = validSizes.includes(Number(size)) ? Number(size) : 15;
+  const FONT_MODES = {
+    xsmall25: { fontSize: "13px", label: "📌 依原作編排顯示（特小字 · 每行約 25 字）" },
+    small:    { fontSize: "15px", label: "小字體模式" },
+    medium:   { fontSize: "17px", label: "中字體模式" },
+    large:    { fontSize: "19px", label: "大字體模式" },
+    xlarge:   { fontSize: "21px", label: "特大字體模式" }
+  };
+
+  function setReaderFontMode(mode) {
+    const targetMode = FONT_MODES[mode] ? mode : "xsmall25";
+    const cfg = FONT_MODES[targetMode];
     const box = document.getElementById("reader-content");
-    if (box) box.style.fontSize = targetSize + "px";
+    const notice = document.getElementById("layout-notice");
+
+    if (box) {
+      box.style.fontSize = cfg.fontSize;
+      box.classList.toggle("mode-xsmall25", targetMode === "xsmall25");
+    }
+    if (notice) {
+      notice.innerText = cfg.label;
+    }
 
     document.querySelectorAll(".font-btn").forEach(btn => {
-      btn.classList.toggle("active", Number(btn.dataset.size) === targetSize);
+      btn.classList.toggle("active", btn.dataset.mode === targetMode);
     });
-    localStorage.setItem("novel_reader_font_size", String(targetSize));
+    localStorage.setItem("novel_reader_font_mode", targetMode);
   }
 
   function isOwnerAccount(username) {
@@ -254,11 +316,16 @@
     return isOwnerAccount(user.username) || Boolean(user.canCreate);
   }
 
+  function getUserNickname(user) {
+    if (!user) return "";
+    return user.nickname || user.username;
+  }
+
   function getDisplayAuthor(novel) {
     const authorUser = Array.isArray(usersData)
       ? usersData.find(u => u.username === novel.author)
       : null;
-    return novel.penName || (authorUser && authorUser.penName) || novel.author;
+    return novel.penName || (authorUser && authorUser.penName) || getUserNickname(authorUser) || novel.author;
   }
 
   function canEditNovel(novel) {
@@ -318,8 +385,8 @@
   }
 
   window.onload = async () => {
-    const savedFont = localStorage.getItem("novel_reader_font_size") || "15";
-    setReaderFontSize(savedFont);
+    const savedMode = localStorage.getItem("novel_reader_font_mode") || "xsmall25";
+    setReaderFontMode(savedMode);
 
     await loadAllData();
     const savedUser = localStorage.getItem("novel_logged_user");
@@ -337,6 +404,7 @@
 
   async function register() {
     const email = document.getElementById("reg-email").value.trim().toLowerCase();
+    const nicknameInput = document.getElementById("reg-nickname").value.trim();
     const username = document.getElementById("reg-user").value.trim();
     const password = document.getElementById("reg-pass").value;
 
@@ -354,6 +422,7 @@
 
     const newUser = {
       email,
+      nickname: nicknameInput || username,
       penName: "",
       username,
       password,
@@ -390,6 +459,7 @@
         if (!ownerUser) {
           ownerUser = {
             email: "owner@local",
+            nickname: "站長",
             penName: "",
             username: CONFIG.OWNER_USER,
             password: CONFIG.OWNER_PASS,
@@ -437,16 +507,16 @@
     const roleLabel = isOwnerAccount(currentUser.username)
       ? "站長 / 創作者"
       : (isCreator ? "創作者" : "讀者");
-    const nameLabel = (isCreator && currentUser.penName)
-      ? `筆名：${currentUser.penName}`
-      : currentUser.username;
-    badge.innerText = `${nameLabel} (${roleLabel})`;
+    const nick = getUserNickname(currentUser);
+    const penPart = (isCreator && currentUser.penName) ? `｜筆名：${currentUser.penName}` : "";
+    badge.innerText = `${nick} (${currentUser.username}) ${penPart} · ${roleLabel}`;
     badge.classList.remove("hidden");
   }
 
   function enterSystem(user) {
     currentUser = user;
     currentUser.progress = currentUser.progress || {};
+    currentUser.nickname = currentUser.nickname || currentUser.username;
     currentUser.penName = currentUser.penName || "";
 
     document.getElementById("auth-section").classList.add("hidden");
@@ -463,7 +533,7 @@
     const isAdmin = isOwnerAccount(user.username);
     document.getElementById("btn-admin").classList.toggle("hidden", !isAdmin);
     if (isAdmin) {
-      renderApplicants();
+      renderAdminPanel();
     }
 
     updateReaderApplyBanner();
@@ -545,6 +615,20 @@
       document.getElementById(sec).classList.add("hidden");
     });
     document.getElementById(id).classList.remove("hidden");
+    if (id === "admin-section" && isOwnerAccount(currentUser?.username)) {
+      renderAdminPanel();
+    }
+  }
+
+  function getRatingSummary(novel) {
+    const ratings = novel.ratings || {};
+    const values = Object.values(ratings).map(Number).filter(v => v >= 1 && v <= 5);
+    if (values.length === 0) {
+      return { avg: 0, count: 0, text: "⭐ 尚無評分（滿分 5 星）" };
+    }
+    const sum = values.reduce((acc, v) => acc + v, 0);
+    const avg = (sum / values.length).toFixed(1);
+    return { avg: Number(avg), count: values.length, text: `⭐ ${avg} / 5.0（共 ${values.length} 人評分）` };
   }
 
   function renderNovelList() {
@@ -560,10 +644,12 @@
         ? `上次閱讀：第 ${prog.chapterIdx + 1} 章 (第 ${prog.page + 1} 頁)`
         : "尚未開始閱讀";
       const authorLabel = getDisplayAuthor(novel);
+      const ratingInfo = getRatingSummary(novel);
 
       return `
         <div class="novel-card">
-          <h3>${novel.title} <span class="badge">筆名：${authorLabel}</span></h3>
+          <h3>${novel.title} <span class="badge">作者：${authorLabel}</span></h3>
+          <p style="font-size:13px; color:#d98200; font-weight:bold; margin:4px 0;">${ratingInfo.text}</p>
           <p style="font-size:14px; color:#555;">${novel.description || "無簡介"}</p>
           <p style="font-size:13px; color:var(--primary); font-weight:bold;">📖 ${progText} ｜ 共 ${novel.chapters.length} 篇</p>
           <button class="small" onclick="openNovelDetail('${novel.id}')">進入作品</button>
@@ -571,6 +657,71 @@
         </div>
       `;
     }).join("");
+  }
+
+  function updateRatingUI(novel) {
+    const summary = getRatingSummary(novel);
+    document.getElementById("detail-rating-summary").innerText = summary.text;
+
+    const myScore = (novel.ratings && novel.ratings[currentUser.username]) ? Number(novel.ratings[currentUser.username]) : 0;
+    document.querySelectorAll(".star-btn").forEach(btn => {
+      const s = Number(btn.dataset.star);
+      btn.classList.toggle("active", s <= myScore);
+    });
+    document.getElementById("user-rating-label").innerText = myScore > 0 ? `你給了 ${myScore} 星` : "尚未評分";
+  }
+
+  async function rateNovel(score) {
+    if (!currentNovelId || !currentUser) return;
+    await loadAllData();
+    const target = novelsData.find(n => n.id === currentNovelId);
+    if (!target) return;
+
+    target.ratings = target.ratings || {};
+    target.ratings[currentUser.username] = Number(score);
+
+    novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Rate novel ${target.title}: ${score} stars`);
+    renderNovelList();
+    openNovelDetail(currentNovelId);
+  }
+
+  function renderCommentsUI(novel) {
+    const listEl = document.getElementById("comment-list");
+    const comments = Array.isArray(novel.comments) ? novel.comments : [];
+    if (comments.length === 0) {
+      listEl.innerHTML = "<p style='font-size:14px; color:#777;'>目前還沒有留言，來搶頭香吧！</p>";
+      return;
+    }
+
+    listEl.innerHTML = comments.slice().reverse().map(c => `
+      <div class="comment-item">
+        <div class="comment-meta"><strong>${c.nickname || c.username}</strong>（帳號：${c.username}）· ${c.time || ""}</div>
+        <div style="font-size:15px; white-space:pre-wrap;">${c.text}</div>
+      </div>
+    `).join("");
+  }
+
+  async function submitComment() {
+    if (!currentNovelId || !currentUser) return;
+    const text = document.getElementById("comment-input").value.trim();
+    if (!text) return alert("請輸入留言內容！");
+
+    await loadAllData();
+    const target = novelsData.find(n => n.id === currentNovelId);
+    if (!target) return;
+
+    target.comments = Array.isArray(target.comments) ? target.comments : [];
+    target.comments.push({
+      username: currentUser.username,
+      nickname: getUserNickname(currentUser),
+      text,
+      time: new Date().toLocaleString("zh-TW", { hour12: false })
+    });
+
+    novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Add comment on ${target.title}`);
+    document.getElementById("comment-input").value = "";
+    renderNovelList();
+    openNovelDetail(currentNovelId);
   }
 
   function openNovelDetail(novelId) {
@@ -584,8 +735,11 @@
     document.getElementById("edit-chapter-panel").classList.add("hidden");
 
     document.getElementById("detail-title").innerText = novel.title;
-    document.getElementById("detail-author").innerText = `作者筆名：${getDisplayAuthor(novel)}`;
+    document.getElementById("detail-author").innerText = `作者：${getDisplayAuthor(novel)}`;
     document.getElementById("detail-desc").innerText = novel.description || "無簡介";
+
+    updateRatingUI(novel);
+    renderCommentsUI(novel);
 
     const prog = currentUser.progress[novel.id];
     const progEl = document.getElementById("detail-progress");
@@ -738,7 +892,6 @@
     openNovelDetail(currentNovelId);
   }
 
-  // 保留你原本規劃的換行（每 20 行一頁，不再強制切斷你原本排好的行）
   function paginateText(text) {
     const lines = text.split("\n");
     const linesPerPage = 20;
@@ -760,10 +913,10 @@
     currentPage = Math.min(Math.max(startPage, 0), paginatedPages.length - 1);
 
     document.getElementById("reader-title").innerText = `${activeNovel.title} - ${chapter.title}`;
-    document.getElementById("reader-meta").innerText = `筆名：${getDisplayAuthor(activeNovel)} ｜ 本章共 ${paginatedPages.length} 頁`;
+    document.getElementById("reader-meta").innerText = `作者：${getDisplayAuthor(activeNovel)} ｜ 本章共 ${paginatedPages.length} 頁`;
 
-    const savedFont = localStorage.getItem("novel_reader_font_size") || "15";
-    setReaderFontSize(savedFont);
+    const savedMode = localStorage.getItem("novel_reader_font_mode") || "xsmall25";
+    setReaderFontMode(savedMode);
 
     updateReaderView();
     showSection("reader-section");
@@ -785,7 +938,6 @@
     renderNovelList();
   }
 
-  // 滑順翻頁動畫（不會生硬直接跳過去）
   function animateAndTurnPage(nextPageIndex, direction) {
     if (isAnimatingPage) return;
     isAnimatingPage = true;
@@ -852,7 +1004,9 @@
       title: novelName,
       description: novelDesc,
       author: currentUser.username,
-      penName: currentUser.penName || currentUser.username,
+      penName: currentUser.penName || getUserNickname(currentUser),
+      ratings: {},
+      comments: [],
       chapters: [{ title: chTitle, content: chContent }]
     });
 
@@ -866,22 +1020,39 @@
     openNovelDetail(newId);
   }
 
-  function renderApplicants() {
+  function renderAdminPanel() {
     const list = document.getElementById("applicant-list");
     const applicants = usersData.filter(u => u.appliedCreator && !u.canCreate);
     if (applicants.length === 0) {
       list.innerHTML = "<p>目前沒有待審核的創作者申請。</p>";
+    } else {
+      list.innerHTML = applicants.map(u => `
+        <div class="novel-card" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+          <div>
+            <strong>暱稱：${getUserNickname(u)}</strong>（帳號：${u.username}）<br>
+            <span style="font-size:13px; color:#666;">信箱：${u.email}</span>
+          </div>
+          <button class="small" onclick="approveCreator('${u.username}')">核准申請</button>
+        </div>
+      `).join("");
+    }
+
+    const allUsersEl = document.getElementById("all-users-list");
+    if (!Array.isArray(usersData) || usersData.length === 0) {
+      allUsersEl.innerHTML = "<p>目前尚無會員資料。</p>";
       return;
     }
-    list.innerHTML = applicants.map(u => `
-      <div class="novel-card" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
-        <div>
-          <strong>${u.username}</strong><br>
-          <span style="font-size:13px; color:#666;">信箱：${u.email}</span>
+
+    allUsersEl.innerHTML = usersData.map(u => {
+      const role = isOwnerAccount(u.username) ? "站長" : (u.canCreate ? "創作者" : "讀者");
+      const penInfo = u.penName ? `｜筆名：${u.penName}` : "";
+      return `
+        <div class="novel-card" style="padding:10px 14px; margin-bottom:8px;">
+          <div><strong>帳號：${u.username}</strong>｜暱稱：${getUserNickname(u)} ${penInfo}</div>
+          <div style="font-size:13px; color:#666;">身分：${role}｜信箱：${u.email || "無"}</div>
         </div>
-        <button class="small" onclick="approveCreator('${u.username}')">核准申請</button>
-      </div>
-    `).join("");
+      `;
+    }).join("");
   }
 
   async function approveCreator(targetUsername) {
@@ -892,7 +1063,7 @@
       u.appliedCreator = false;
       usersSha = await saveGitHubFile("password.json", usersData, usersSha, `Approve creator ${targetUsername}`);
       alert(`已核准 ${targetUsername} 的創作權限！核准後對方即可填寫筆名與發表作品。`);
-      renderApplicants();
+      renderAdminPanel();
     }
   }
 </script>
