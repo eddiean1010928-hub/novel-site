@@ -13,7 +13,7 @@
     input, textarea, select, button { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid var(--border); border-radius: 8px; box-sizing: border-box; font-size: 16px; }
     button { background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; }
     button:hover { opacity: 0.9; }
-    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
     button.secondary { background: #6e6e73; }
     button.danger { background: #ff3b30; }
     button.success { background: #28a745; }
@@ -58,7 +58,7 @@
     }
     .reader-box.mode-xsmall25 {
       font-size: 13px;
-      max-width: 27.5em; /* 約 25 字一行寬度 */
+      max-width: 27.5em;
       margin: 0 auto;
     }
     .reader-box.slide-out-left { transform: translateX(-32px); opacity: 0; }
@@ -69,6 +69,7 @@
     .pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; }
     .pagination button { width: 30%; }
     .badge { background: #e8f2ff; color: var(--primary); padding: 2px 8px; border-radius: 12px; font-size: 12px; }
+    .badge.warn { background: #fff3cd; color: #856404; }
     .notice { background: #f2f6fc; border-left: 4px solid var(--primary); padding: 10px 14px; border-radius: 6px; font-size: 14px; margin-bottom: 12px; }
     .panel { background: #fafafa; border: 1px solid var(--border); padding: 15px; border-radius: 10px; margin-top: 14px; }
   </style>
@@ -93,7 +94,7 @@
     <div id="login-form">
       <input type="text" id="login-user" placeholder="請輸入帳號">
       <input type="password" id="login-pass" placeholder="請輸入密碼">
-      <button onclick="login()">登入</button>
+      <button id="btn-login" onclick="login(this)">登入</button>
       <p style="text-align:center;"><a href="#" onclick="toggleAuthMode(true)">還沒有帳號？點此註冊</a></p>
     </div>
 
@@ -105,7 +106,7 @@
       <input type="text" id="reg-nickname" placeholder="暱稱（大家看到的名稱，未填則同帳號）">
       <input type="text" id="reg-user" placeholder="設定帳號">
       <input type="password" id="reg-pass" placeholder="設定密碼">
-      <button onclick="register()">完成註冊</button>
+      <button id="btn-register" onclick="register(this)">完成註冊</button>
       <p style="text-align:center;"><a href="#" onclick="toggleAuthMode(false)">已有帳號？返回登入</a></p>
     </div>
   </div>
@@ -116,13 +117,13 @@
       <strong>✍️ 寫作者筆名設定：</strong>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:6px;">
         <input type="text" id="penname-input" placeholder="輸入你的寫作者筆名" style="flex:1; min-width:180px; margin:0;">
-        <button class="small" style="margin:0;" onclick="savePenname()">儲存筆名</button>
+        <button id="btn-save-penname" class="small" style="margin:0;" onclick="savePenname(this)">儲存筆名</button>
       </div>
     </div>
 
     <div id="reader-apply-banner" class="notice hidden">
       <span>你目前是一般讀者身分。通過申請後即可設定筆名並發表自己的作品！</span>
-      <button id="btn-request-access" class="secondary small" onclick="requestCreatorAccess()">向管理員申請創作權限</button>
+      <button id="btn-request-access" class="secondary small" onclick="requestCreatorAccess(this)">向管理員申請創作權限</button>
       <div id="apply-status-text" style="font-weight:bold; margin-top:6px;"></div>
     </div>
 
@@ -134,17 +135,18 @@
   <div id="novel-detail-section" class="hidden">
     <button class="secondary small" onclick="showSection('home-section')">← 返回作品列表</button>
     <h2 id="detail-title"></h2>
+    <span id="detail-delete-status" class="badge warn hidden">刪除審核中</span>
     <p id="detail-author" style="color:var(--primary); font-weight:bold; margin:4px 0;"></p>
     <p id="detail-rating-summary" style="font-size:14px; font-weight:bold; margin:6px 0;"></p>
 
     <!-- 作品評分（滿分 5 顆星） -->
     <div class="rating-box">
       <span style="font-size:14px;">你的評分（滿分 5 ⭐）：</span>
-      <button type="button" class="star-btn" data-star="1" onclick="rateNovel(1)">★</button>
-      <button type="button" class="star-btn" data-star="2" onclick="rateNovel(2)">★</button>
-      <button type="button" class="star-btn" data-star="3" onclick="rateNovel(3)">★</button>
-      <button type="button" class="star-btn" data-star="4" onclick="rateNovel(4)">★</button>
-      <button type="button" class="star-btn" data-star="5" onclick="rateNovel(5)">★</button>
+      <button type="button" class="star-btn" data-star="1" onclick="rateNovel(1, this)">★</button>
+      <button type="button" class="star-btn" data-star="2" onclick="rateNovel(2, this)">★</button>
+      <button type="button" class="star-btn" data-star="3" onclick="rateNovel(3, this)">★</button>
+      <button type="button" class="star-btn" data-star="4" onclick="rateNovel(4, this)">★</button>
+      <button type="button" class="star-btn" data-star="5" onclick="rateNovel(5, this)">★</button>
       <span id="user-rating-label" style="font-size:13px; color:#666;"></span>
     </div>
 
@@ -159,6 +161,7 @@
     <div id="author-novel-actions" class="hidden" style="margin-top:10px;">
       <button class="secondary small" onclick="toggleEditNovelPanel()">編輯標題與簡介</button>
       <button class="small" onclick="toggleAddChapterPanel()">新增篇章</button>
+      <button id="btn-apply-delete-novel" class="danger small" onclick="requestDeleteNovel(this)">申請刪除作品</button>
     </div>
 
     <!-- 編輯作品標題與簡介面板 -->
@@ -168,7 +171,7 @@
       <input type="text" id="edit-novel-title-input" placeholder="輸入新的作品標題">
       <label style="font-size:14px; font-weight:bold;">作品簡介</label>
       <textarea id="edit-novel-desc-input" rows="3" placeholder="輸入新的作品簡介"></textarea>
-      <button class="success" onclick="saveNovelInfo()">儲存標題與簡介</button>
+      <button id="btn-save-novel-info" class="success" onclick="saveNovelInfo(this)">儲存標題與簡介</button>
       <button class="secondary" onclick="document.getElementById('edit-novel-panel').classList.add('hidden')">取消</button>
     </div>
 
@@ -177,7 +180,7 @@
       <h3>新增篇章</h3>
       <input type="text" id="new-chapter-title" placeholder="篇章標題（例如：第一章 命運的開端）">
       <textarea id="new-chapter-content" rows="10" placeholder="輸入篇章內文（依你原本換行每 20 行自動分一頁）..."></textarea>
-      <button onclick="addChapterToNovel()">發布此篇章</button>
+      <button id="btn-add-chapter" onclick="addChapterToNovel(this)">發布此篇章</button>
       <button class="secondary" onclick="document.getElementById('add-chapter-panel').classList.add('hidden')">取消</button>
     </div>
 
@@ -186,18 +189,18 @@
       <h3>編輯篇章：<span id="editing-chapter-label"></span></h3>
       <input type="text" id="edit-chapter-title-input" placeholder="篇章標題">
       <textarea id="edit-chapter-content-input" rows="10" placeholder="篇章內文"></textarea>
-      <button class="success" onclick="saveChapterEdit()">儲存篇章修改</button>
+      <button id="btn-save-chapter" class="success" onclick="saveChapterEdit(this)">儲存篇章修改</button>
       <button class="secondary" onclick="cancelChapterEdit()">取消</button>
     </div>
 
     <h3 style="margin-top:20px;">篇章列表</h3>
     <div id="detail-chapter-list"></div>
 
-    <!-- 公開留言區（在作品簡介下方，所有人都看得到） -->
+    <!-- 公開留言區 -->
     <div class="panel" style="margin-top:22px;">
       <h3>💬 作品留言區（大家皆可見）</h3>
       <textarea id="comment-input" rows="2" placeholder="寫下你對這部作品的想法或留言..."></textarea>
-      <button class="small" onclick="submitComment()">送出留言</button>
+      <button id="btn-submit-comment" class="small" onclick="submitComment(this)">送出留言</button>
       <div id="comment-list" style="margin-top:12px;"></div>
     </div>
   </div>
@@ -210,7 +213,7 @@
     <textarea id="edit-novel-desc" rows="2" placeholder="作品簡介"></textarea>
     <input type="text" id="edit-chapter-title" placeholder="第一篇標題（例如：第一章 命運的開端）">
     <textarea id="edit-chapter-content" rows="10" placeholder="請在此輸入小說內文（依你原本換行每 20 行自動分一頁）..."></textarea>
-    <button onclick="publishNewNovel()">建立並發布</button>
+    <button id="btn-publish-novel" onclick="publishNewNovel(this)">建立並發布</button>
   </div>
 
   <!-- 5. 閱讀器區塊 -->
@@ -241,12 +244,15 @@
     </div>
   </div>
 
-  <!-- 6. 管理員面板（創作者申請審核 ＋ 所有會員帳號列表） -->
+  <!-- 6. 管理員面板 -->
   <div id="admin-section" class="hidden">
-    <h2>創作者資格申請審核</h2>
+    <h2>🗑️ 作品刪除申請審核</h2>
+    <div id="delete-request-list"></div>
+
+    <h2 style="margin-top:24px;">✍️ 創作者資格申請審核</h2>
     <div id="applicant-list"></div>
 
-    <h2 style="margin-top:24px;">所有註冊會員帳號總覽</h2>
+    <h2 style="margin-top:24px;">👥 所有註冊會員帳號總覽</h2>
     <div id="all-users-list"></div>
   </div>
 </div>
@@ -270,6 +276,9 @@
   let novelsSha = "";
   let currentUser = null;
 
+  // 防連點與卡住鎖定狀態
+  let isSaving = false;
+
   let currentNovelId = null;
   let editingChapterIndex = null;
 
@@ -278,6 +287,42 @@
   let paginatedPages = [];
   let currentPage = 0;
   let isAnimatingPage = false;
+
+  // 單次執行鎖定器：避免卡住時重複按很多下
+  async function runSingleAction(btnEl, busyText, taskFn) {
+    if (isSaving) return;
+    isSaving = true;
+
+    const origText = btnEl ? btnEl.innerText : "";
+    if (btnEl) {
+      btnEl.disabled = true;
+      if (busyText) btnEl.innerText = busyText;
+    }
+
+    const timeoutGuard = setTimeout(() => {
+      if (isSaving) {
+        isSaving = false;
+        if (btnEl) {
+          btnEl.disabled = false;
+          if (origText) btnEl.innerText = origText;
+        }
+      }
+    }, 15000);
+
+    try {
+      await taskFn();
+    } catch (err) {
+      alert("操作失敗：\n" + err.message);
+      console.error(err);
+    } finally {
+      clearTimeout(timeoutGuard);
+      isSaving = false;
+      if (btnEl) {
+        btnEl.disabled = false;
+        if (origText) btnEl.innerText = origText;
+      }
+    }
+  }
 
   const FONT_MODES = {
     xsmall25: { fontSize: "13px", label: "📌 依原作編排顯示（特小字 · 每行約 25 字）" },
@@ -368,31 +413,29 @@
   }
 
   async function loadAllData() {
-    try {
-      const uRes = await fetchGitHubFile("password.json");
-      usersData = Array.isArray(uRes.json) ? uRes.json : [];
-      usersSha = uRes.sha;
+    const uRes = await fetchGitHubFile("password.json");
+    usersData = Array.isArray(uRes.json) ? uRes.json : [];
+    usersSha = uRes.sha;
 
-      const nRes = await fetchGitHubFile("novels.json");
-      novelsData = Array.isArray(nRes.json) ? nRes.json : [];
-      novelsSha = nRes.sha;
-    } catch (e) {
-      usersData = Array.isArray(usersData) ? usersData : [];
-      novelsData = Array.isArray(novelsData) ? novelsData : [];
-      alert("讀取資料庫失敗：\n" + e.message);
-      console.error(e);
-    }
+    const nRes = await fetchGitHubFile("novels.json");
+    novelsData = Array.isArray(nRes.json) ? nRes.json : [];
+    novelsSha = nRes.sha;
   }
 
   window.onload = async () => {
     const savedMode = localStorage.getItem("novel_reader_font_mode") || "xsmall25";
     setReaderFontMode(savedMode);
 
-    await loadAllData();
-    const savedUser = localStorage.getItem("novel_logged_user");
-    if (savedUser && Array.isArray(usersData)) {
-      const found = usersData.find(u => u.username === savedUser);
-      if (found) enterSystem(found);
+    try {
+      await loadAllData();
+      const savedUser = localStorage.getItem("novel_logged_user");
+      if (savedUser && Array.isArray(usersData)) {
+        const found = usersData.find(u => u.username === savedUser);
+        if (found) enterSystem(found);
+      }
+    } catch (e) {
+      alert("讀取資料庫失敗：\n" + e.message);
+      console.error(e);
     }
   };
 
@@ -402,55 +445,52 @@
     document.getElementById("auth-title").innerText = isReg ? "註冊新帳號" : "登入系統";
   }
 
-  async function register() {
-    const email = document.getElementById("reg-email").value.trim().toLowerCase();
-    const nicknameInput = document.getElementById("reg-nickname").value.trim();
-    const username = document.getElementById("reg-user").value.trim();
-    const password = document.getElementById("reg-pass").value;
+  async function register(btnEl) {
+    await runSingleAction(btnEl, "註冊中...", async () => {
+      const email = document.getElementById("reg-email").value.trim().toLowerCase();
+      const nicknameInput = document.getElementById("reg-nickname").value.trim();
+      const username = document.getElementById("reg-user").value.trim();
+      const password = document.getElementById("reg-pass").value;
 
-    if (!email || !email.includes("@")) return alert("請輸入有效的電子郵件！");
-    if (!username || !password) return alert("帳號與密碼不能為空！");
-    if (isOwnerAccount(username)) return alert("此帳號為站長專屬帳號，無法透過一般註冊建立！");
+      if (!email || !email.includes("@")) return alert("請輸入有效的電子郵件！");
+      if (!username || !password) return alert("帳號與密碼不能為空！");
+      if (isOwnerAccount(username)) return alert("此帳號為站長專屬帳號，無法透過一般註冊建立！");
 
-    await loadAllData();
-    if (usersData.some(u => u.email === email)) {
-      return alert("此電子郵件已經註冊過帳號，同個電子郵件不能創兩個帳號！");
-    }
-    if (usersData.some(u => u.username === username)) {
-      return alert("此帳號名稱已被註冊！");
-    }
+      await loadAllData();
+      if (usersData.some(u => u.email === email)) {
+        return alert("此電子郵件已經註冊過帳號，同個電子郵件不能創兩個帳號！");
+      }
+      if (usersData.some(u => u.username === username)) {
+        return alert("此帳號名稱已被註冊！");
+      }
 
-    const newUser = {
-      email,
-      nickname: nicknameInput || username,
-      penName: "",
-      username,
-      password,
-      canCreate: false,
-      appliedCreator: false,
-      progress: {}
-    };
+      const newUser = {
+        email,
+        nickname: nicknameInput || username,
+        penName: "",
+        username,
+        password,
+        canCreate: false,
+        appliedCreator: false,
+        progress: {}
+      };
 
-    usersData.push(newUser);
-    usersSha = await saveGitHubFile("password.json", usersData, usersSha, `Register user ${username}`);
-    alert("註冊成功！請使用剛建立的帳號登入。");
-    toggleAuthMode(false);
+      usersData.push(newUser);
+      usersSha = await saveGitHubFile("password.json", usersData, usersSha, `Register user ${username}`);
+      alert("註冊成功！請使用剛建立的帳號登入。");
+      toggleAuthMode(false);
+    });
   }
 
-  async function login() {
-    const btn = document.querySelector("#login-form button");
-    const username = document.getElementById("login-user").value.trim();
-    const password = document.getElementById("login-pass").value;
+  async function login(btnEl) {
+    await runSingleAction(btnEl, "登入中...", async () => {
+      const username = document.getElementById("login-user").value.trim();
+      const password = document.getElementById("login-pass").value;
 
-    if (!username || !password) {
-      alert("請輸入帳號與密碼！");
-      return;
-    }
+      if (!username || !password) {
+        return alert("請輸入帳號與密碼！");
+      }
 
-    btn.disabled = true;
-    btn.innerText = "登入中...";
-
-    try {
       await loadAllData();
       if (!Array.isArray(usersData)) usersData = [];
 
@@ -481,19 +521,12 @@
 
       const user = usersData.find(u => u.username === username && u.password === password);
       if (!user) {
-        alert("帳號或密碼錯誤！");
-        return;
+        return alert("帳號或密碼錯誤！");
       }
 
       localStorage.setItem("novel_logged_user", user.username);
       enterSystem(user);
-    } catch (err) {
-      alert("登入過程發生錯誤：\n" + err.message);
-      console.error(err);
-    } finally {
-      btn.disabled = false;
-      btn.innerText = "登入";
-    }
+    });
   }
 
   function logout() {
@@ -541,38 +574,40 @@
     showSection("home-section");
   }
 
-  async function savePenname() {
-    if (!hasCreatorPermission(currentUser)) {
-      return alert("需先申請並通過創作權限後，才能設定筆名！");
-    }
-    const newPen = document.getElementById("penname-input").value.trim();
-    if (!newPen) return alert("筆名不能為空！");
-
-    await loadAllData();
-    const uIdx = usersData.findIndex(u => u.username === currentUser.username);
-    if (uIdx !== -1) {
-      usersData[uIdx].penName = newPen;
-      currentUser = usersData[uIdx];
-      usersSha = await saveGitHubFile("password.json", usersData, usersSha, `Update penName for ${currentUser.username}`);
-    } else {
-      currentUser.penName = newPen;
-    }
-
-    let novelChanged = false;
-    novelsData.forEach(n => {
-      if (n.author === currentUser.username) {
-        n.penName = newPen;
-        novelChanged = true;
+  async function savePenname(btnEl) {
+    await runSingleAction(btnEl, "儲存中...", async () => {
+      if (!hasCreatorPermission(currentUser)) {
+        return alert("需先申請並通過創作權限後，才能設定筆名！");
       }
-    });
-    if (novelChanged) {
-      novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Sync penName on novels by ${currentUser.username}`);
-    }
+      const newPen = document.getElementById("penname-input").value.trim();
+      if (!newPen) return alert("筆名不能為空！");
 
-    refreshUserBadge();
-    renderNovelList();
-    if (currentNovelId) openNovelDetail(currentNovelId);
-    alert(`已儲存寫作者筆名：「${newPen}」！`);
+      await loadAllData();
+      const uIdx = usersData.findIndex(u => u.username === currentUser.username);
+      if (uIdx !== -1) {
+        usersData[uIdx].penName = newPen;
+        currentUser = usersData[uIdx];
+        usersSha = await saveGitHubFile("password.json", usersData, usersSha, `Update penName for ${currentUser.username}`);
+      } else {
+        currentUser.penName = newPen;
+      }
+
+      let novelChanged = false;
+      novelsData.forEach(n => {
+        if (n.author === currentUser.username) {
+          n.penName = newPen;
+          novelChanged = true;
+        }
+      });
+      if (novelChanged) {
+        novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Sync penName on novels by ${currentUser.username}`);
+      }
+
+      refreshUserBadge();
+      renderNovelList();
+      if (currentNovelId) openNovelDetail(currentNovelId);
+      alert(`已儲存寫作者筆名：「${newPen}」！`);
+    });
   }
 
   function updateReaderApplyBanner() {
@@ -595,19 +630,21 @@
     }
   }
 
-  async function requestCreatorAccess() {
-    if (hasCreatorPermission(currentUser)) return alert("你已經擁有創作權限了！");
-    if (currentUser.appliedCreator) return alert("你已經申請過了，請耐心等待審核！");
+  async function requestCreatorAccess(btnEl) {
+    await runSingleAction(btnEl, "送出中...", async () => {
+      if (hasCreatorPermission(currentUser)) return alert("你已經擁有創作權限了！");
+      if (currentUser.appliedCreator) return alert("你已經申請過了，請耐心等待審核！");
 
-    await loadAllData();
-    const u = usersData.find(user => user.username === currentUser.username);
-    if (u) {
-      u.appliedCreator = true;
-      currentUser = u;
-      usersSha = await saveGitHubFile("password.json", usersData, usersSha, `Request creator from ${currentUser.username}`);
-      updateReaderApplyBanner();
-      alert("已向管理員提出創作權限申請！");
-    }
+      await loadAllData();
+      const u = usersData.find(user => user.username === currentUser.username);
+      if (u) {
+        u.appliedCreator = true;
+        currentUser = u;
+        usersSha = await saveGitHubFile("password.json", usersData, usersSha, `Request creator from ${currentUser.username}`);
+        updateReaderApplyBanner();
+        alert("已向管理員提出創作權限申請！");
+      }
+    });
   }
 
   function showSection(id) {
@@ -645,10 +682,11 @@
         : "尚未開始閱讀";
       const authorLabel = getDisplayAuthor(novel);
       const ratingInfo = getRatingSummary(novel);
+      const delTag = novel.deleteRequested ? `<span class="badge warn">刪除審核中</span>` : "";
 
       return `
         <div class="novel-card">
-          <h3>${novel.title} <span class="badge">作者：${authorLabel}</span></h3>
+          <h3>${novel.title} <span class="badge">作者：${authorLabel}</span> ${delTag}</h3>
           <p style="font-size:13px; color:#d98200; font-weight:bold; margin:4px 0;">${ratingInfo.text}</p>
           <p style="font-size:14px; color:#555;">${novel.description || "無簡介"}</p>
           <p style="font-size:13px; color:var(--primary); font-weight:bold;">📖 ${progText} ｜ 共 ${novel.chapters.length} 篇</p>
@@ -671,18 +709,20 @@
     document.getElementById("user-rating-label").innerText = myScore > 0 ? `你給了 ${myScore} 星` : "尚未評分";
   }
 
-  async function rateNovel(score) {
-    if (!currentNovelId || !currentUser) return;
-    await loadAllData();
-    const target = novelsData.find(n => n.id === currentNovelId);
-    if (!target) return;
+  async function rateNovel(score, btnEl) {
+    await runSingleAction(btnEl, null, async () => {
+      if (!currentNovelId || !currentUser) return;
+      await loadAllData();
+      const target = novelsData.find(n => n.id === currentNovelId);
+      if (!target) return;
 
-    target.ratings = target.ratings || {};
-    target.ratings[currentUser.username] = Number(score);
+      target.ratings = target.ratings || {};
+      target.ratings[currentUser.username] = Number(score);
 
-    novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Rate novel ${target.title}: ${score} stars`);
-    renderNovelList();
-    openNovelDetail(currentNovelId);
+      novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Rate novel ${target.title}: ${score} stars`);
+      renderNovelList();
+      openNovelDetail(currentNovelId);
+    });
   }
 
   function renderCommentsUI(novel) {
@@ -701,27 +741,29 @@
     `).join("");
   }
 
-  async function submitComment() {
-    if (!currentNovelId || !currentUser) return;
-    const text = document.getElementById("comment-input").value.trim();
-    if (!text) return alert("請輸入留言內容！");
+  async function submitComment(btnEl) {
+    await runSingleAction(btnEl, "送出中...", async () => {
+      if (!currentNovelId || !currentUser) return;
+      const text = document.getElementById("comment-input").value.trim();
+      if (!text) return alert("請輸入留言內容！");
 
-    await loadAllData();
-    const target = novelsData.find(n => n.id === currentNovelId);
-    if (!target) return;
+      await loadAllData();
+      const target = novelsData.find(n => n.id === currentNovelId);
+      if (!target) return;
 
-    target.comments = Array.isArray(target.comments) ? target.comments : [];
-    target.comments.push({
-      username: currentUser.username,
-      nickname: getUserNickname(currentUser),
-      text,
-      time: new Date().toLocaleString("zh-TW", { hour12: false })
+      target.comments = Array.isArray(target.comments) ? target.comments : [];
+      target.comments.push({
+        username: currentUser.username,
+        nickname: getUserNickname(currentUser),
+        text,
+        time: new Date().toLocaleString("zh-TW", { hour12: false })
+      });
+
+      novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Add comment on ${target.title}`);
+      document.getElementById("comment-input").value = "";
+      renderNovelList();
+      openNovelDetail(currentNovelId);
     });
-
-    novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Add comment on ${target.title}`);
-    document.getElementById("comment-input").value = "";
-    renderNovelList();
-    openNovelDetail(currentNovelId);
   }
 
   function openNovelDetail(novelId) {
@@ -735,6 +777,7 @@
     document.getElementById("edit-chapter-panel").classList.add("hidden");
 
     document.getElementById("detail-title").innerText = novel.title;
+    document.getElementById("detail-delete-status").classList.toggle("hidden", !novel.deleteRequested);
     document.getElementById("detail-author").innerText = `作者：${getDisplayAuthor(novel)}`;
     document.getElementById("detail-desc").innerText = novel.description || "無簡介";
 
@@ -755,6 +798,15 @@
     const canManage = canEditNovel(novel);
     document.getElementById("author-novel-actions").classList.toggle("hidden", !canManage);
 
+    const delBtn = document.getElementById("btn-apply-delete-novel");
+    if (novel.deleteRequested) {
+      delBtn.innerText = "已申請刪除（審核中）";
+      delBtn.disabled = true;
+    } else {
+      delBtn.innerText = "申請刪除作品";
+      delBtn.disabled = false;
+    }
+
     const chapListEl = document.getElementById("detail-chapter-list");
     if (!novel.chapters || novel.chapters.length === 0) {
       chapListEl.innerHTML = "<p>目前尚無篇章。</p>";
@@ -771,6 +823,71 @@
     }
 
     showSection("novel-detail-section");
+  }
+
+  // 申請刪除作品（需站長審核）
+  async function requestDeleteNovel(btnEl) {
+    await runSingleAction(btnEl, "送出申請中...", async () => {
+      if (!currentNovelId || !currentUser) return;
+      const novel = novelsData.find(n => n.id === currentNovelId);
+      if (!canEditNovel(novel)) return alert("只有作品作者或站長可以申請刪除！");
+      if (novel.deleteRequested) return alert("此作品已經提出刪除申請，正在等待站長審核！");
+      if (!confirm(`確定要申請刪除《${novel.title}》嗎？送出後需由站長審核確認。`)) return;
+
+      await loadAllData();
+      const target = novelsData.find(n => n.id === currentNovelId);
+      if (target) {
+        target.deleteRequested = true;
+        target.deleteRequestedBy = currentUser.username;
+        target.deleteRequestedTime = new Date().toLocaleString("zh-TW", { hour12: false });
+        novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Request delete novel ${target.title}`);
+      }
+
+      alert("已送出刪除申請，請等待站長審核！");
+      renderNovelList();
+      openNovelDetail(currentNovelId);
+    });
+  }
+
+  // 站長核准刪除作品
+  async function approveDeleteNovel(novelId, btnEl) {
+    await runSingleAction(btnEl, "刪除中...", async () => {
+      if (!isOwnerAccount(currentUser?.username)) return;
+      await loadAllData();
+      const target = novelsData.find(n => n.id === novelId);
+      if (!target) return;
+      if (!confirm(`確定要永久刪除《${target.title}》嗎？`)) return;
+
+      novelsData = novelsData.filter(n => n.id !== novelId);
+      novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Approve delete novel ${novelId}`);
+
+      if (currentNovelId === novelId) {
+        currentNovelId = null;
+      }
+
+      alert("已核准並刪除該作品！");
+      renderNovelList();
+      renderAdminPanel();
+    });
+  }
+
+  // 站長駁回刪除申請
+  async function rejectDeleteNovel(novelId, btnEl) {
+    await runSingleAction(btnEl, "處理中...", async () => {
+      if (!isOwnerAccount(currentUser?.username)) return;
+      await loadAllData();
+      const target = novelsData.find(n => n.id === novelId);
+      if (!target) return;
+
+      target.deleteRequested = false;
+      delete target.deleteRequestedBy;
+      delete target.deleteRequestedTime;
+      novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Reject delete request for ${novelId}`);
+
+      alert("已駁回此作品的刪除申請。");
+      renderNovelList();
+      renderAdminPanel();
+    });
   }
 
   function continueActiveNovel() {
@@ -800,25 +917,27 @@
     panel.classList.toggle("hidden");
   }
 
-  async function saveNovelInfo() {
-    const novel = novelsData.find(n => n.id === currentNovelId);
-    if (!canEditNovel(novel)) return;
+  async function saveNovelInfo(btnEl) {
+    await runSingleAction(btnEl, "儲存中...", async () => {
+      const novel = novelsData.find(n => n.id === currentNovelId);
+      if (!canEditNovel(novel)) return;
 
-    const newTitle = document.getElementById("edit-novel-title-input").value.trim();
-    const newDesc = document.getElementById("edit-novel-desc-input").value.trim();
-    if (!newTitle) return alert("作品標題不能為空！");
+      const newTitle = document.getElementById("edit-novel-title-input").value.trim();
+      const newDesc = document.getElementById("edit-novel-desc-input").value.trim();
+      if (!newTitle) return alert("作品標題不能為空！");
 
-    await loadAllData();
-    const target = novelsData.find(n => n.id === currentNovelId);
-    if (target) {
-      target.title = newTitle;
-      target.description = newDesc;
-      novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Edit novel title & desc: ${newTitle}`);
-    }
+      await loadAllData();
+      const target = novelsData.find(n => n.id === currentNovelId);
+      if (target) {
+        target.title = newTitle;
+        target.description = newDesc;
+        novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Edit novel title & desc: ${newTitle}`);
+      }
 
-    alert("作品標題與簡介已更新！");
-    renderNovelList();
-    openNovelDetail(currentNovelId);
+      alert("作品標題與簡介已更新！");
+      renderNovelList();
+      openNovelDetail(currentNovelId);
+    });
   }
 
   function toggleAddChapterPanel() {
@@ -830,26 +949,28 @@
     panel.classList.toggle("hidden");
   }
 
-  async function addChapterToNovel() {
-    const novel = novelsData.find(n => n.id === currentNovelId);
-    if (!canEditNovel(novel)) return;
+  async function addChapterToNovel(btnEl) {
+    await runSingleAction(btnEl, "發布中...", async () => {
+      const novel = novelsData.find(n => n.id === currentNovelId);
+      if (!canEditNovel(novel)) return;
 
-    const chTitle = document.getElementById("new-chapter-title").value.trim();
-    const chContent = document.getElementById("new-chapter-content").value;
-    if (!chTitle || !chContent) return alert("篇章標題與內文不能為空！");
+      const chTitle = document.getElementById("new-chapter-title").value.trim();
+      const chContent = document.getElementById("new-chapter-content").value;
+      if (!chTitle || !chContent) return alert("篇章標題與內文不能為空！");
 
-    await loadAllData();
-    const target = novelsData.find(n => n.id === currentNovelId);
-    if (target) {
-      target.chapters.push({ title: chTitle, content: chContent });
-      novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Add chapter ${chTitle}`);
-    }
+      await loadAllData();
+      const target = novelsData.find(n => n.id === currentNovelId);
+      if (target) {
+        target.chapters.push({ title: chTitle, content: chContent });
+        novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Add chapter ${chTitle}`);
+      }
 
-    document.getElementById("new-chapter-title").value = "";
-    document.getElementById("new-chapter-content").value = "";
-    alert("新篇章已發布！");
-    renderNovelList();
-    openNovelDetail(currentNovelId);
+      document.getElementById("new-chapter-title").value = "";
+      document.getElementById("new-chapter-content").value = "";
+      alert("新篇章已發布！");
+      renderNovelList();
+      openNovelDetail(currentNovelId);
+    });
   }
 
   function startEditChapter(idx) {
@@ -871,25 +992,27 @@
     document.getElementById("edit-chapter-panel").classList.add("hidden");
   }
 
-  async function saveChapterEdit() {
-    const novel = novelsData.find(n => n.id === currentNovelId);
-    if (!canEditNovel(novel) || editingChapterIndex === null) return;
+  async function saveChapterEdit(btnEl) {
+    await runSingleAction(btnEl, "儲存中...", async () => {
+      const novel = novelsData.find(n => n.id === currentNovelId);
+      if (!canEditNovel(novel) || editingChapterIndex === null) return;
 
-    const newTitle = document.getElementById("edit-chapter-title-input").value.trim();
-    const newContent = document.getElementById("edit-chapter-content-input").value;
-    if (!newTitle || !newContent) return alert("篇章標題與內文不能為空！");
+      const newTitle = document.getElementById("edit-chapter-title-input").value.trim();
+      const newContent = document.getElementById("edit-chapter-content-input").value;
+      if (!newTitle || !newContent) return alert("篇章標題與內文不能為空！");
 
-    await loadAllData();
-    const target = novelsData.find(n => n.id === currentNovelId);
-    if (target && target.chapters[editingChapterIndex]) {
-      target.chapters[editingChapterIndex].title = newTitle;
-      target.chapters[editingChapterIndex].content = newContent;
-      novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Edit chapter ${newTitle}`);
-    }
+      await loadAllData();
+      const target = novelsData.find(n => n.id === currentNovelId);
+      if (target && target.chapters[editingChapterIndex]) {
+        target.chapters[editingChapterIndex].title = newTitle;
+        target.chapters[editingChapterIndex].content = newContent;
+        novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Edit chapter ${newTitle}`);
+      }
 
-    editingChapterIndex = null;
-    alert("篇章修改已儲存！");
-    openNovelDetail(currentNovelId);
+      editingChapterIndex = null;
+      alert("篇章修改已儲存！");
+      openNovelDetail(currentNovelId);
+    });
   }
 
   function paginateText(text) {
@@ -931,9 +1054,16 @@
       page: currentPage
     };
     const uIdx = usersData.findIndex(u => u.username === currentUser.username);
-    if (uIdx !== -1) {
-      usersData[uIdx] = currentUser;
-      usersSha = await saveGitHubFile("password.json", usersData, usersSha, `Update progress for ${currentUser.username}`);
+    if (uIdx !== -1 && !isSaving) {
+      isSaving = true;
+      try {
+        usersData[uIdx] = currentUser;
+        usersSha = await saveGitHubFile("password.json", usersData, usersSha, `Update progress for ${currentUser.username}`);
+      } catch (e) {
+        console.error("進度儲存失敗：", e);
+      } finally {
+        isSaving = false;
+      }
     }
     renderNovelList();
   }
@@ -983,44 +1113,68 @@
       if (currentUser.appliedCreator) {
         alert("你已經提交過申請，請等待管理員審核通過！");
       } else if (confirm("一般帳號需申請才能發表作品與設定筆名，是否立即向管理員提出申請？")) {
-        await requestCreatorAccess();
+        await requestCreatorAccess(document.getElementById("btn-request-access"));
       }
     }
   }
 
-  async function publishNewNovel() {
-    const novelName = document.getElementById("edit-novel-name").value.trim();
-    const novelDesc = document.getElementById("edit-novel-desc").value.trim();
-    const chTitle = document.getElementById("edit-chapter-title").value.trim();
-    const chContent = document.getElementById("edit-chapter-content").value;
+  async function publishNewNovel(btnEl) {
+    await runSingleAction(btnEl, "建立中...", async () => {
+      const novelName = document.getElementById("edit-novel-name").value.trim();
+      const novelDesc = document.getElementById("edit-novel-desc").value.trim();
+      const chTitle = document.getElementById("edit-chapter-title").value.trim();
+      const chContent = document.getElementById("edit-chapter-content").value;
 
-    if (!novelName) return alert("請輸入新作品名稱！");
-    if (!chTitle || !chContent) return alert("第一篇標題與內文不能為空！");
+      if (!novelName) return alert("請輸入新作品名稱！");
+      if (!chTitle || !chContent) return alert("第一篇標題與內文不能為空！");
 
-    await loadAllData();
-    const newId = "novel_" + Date.now();
-    novelsData.push({
-      id: newId,
-      title: novelName,
-      description: novelDesc,
-      author: currentUser.username,
-      penName: currentUser.penName || getUserNickname(currentUser),
-      ratings: {},
-      comments: [],
-      chapters: [{ title: chTitle, content: chContent }]
+      await loadAllData();
+      const newId = "novel_" + Date.now();
+      novelsData.push({
+        id: newId,
+        title: novelName,
+        description: novelDesc,
+        author: currentUser.username,
+        penName: currentUser.penName || getUserNickname(currentUser),
+        ratings: {},
+        comments: [],
+        deleteRequested: false,
+        chapters: [{ title: chTitle, content: chContent }]
+      });
+
+      novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Create novel ${novelName}`);
+      alert("新作品已建立！");
+      document.getElementById("edit-novel-name").value = "";
+      document.getElementById("edit-novel-desc").value = "";
+      document.getElementById("edit-chapter-title").value = "";
+      document.getElementById("edit-chapter-content").value = "";
+      renderNovelList();
+      openNovelDetail(newId);
     });
-
-    novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Create novel ${novelName}`);
-    alert("新作品已建立！");
-    document.getElementById("edit-novel-name").value = "";
-    document.getElementById("edit-novel-desc").value = "";
-    document.getElementById("edit-chapter-title").value = "";
-    document.getElementById("edit-chapter-content").value = "";
-    renderNovelList();
-    openNovelDetail(newId);
   }
 
   function renderAdminPanel() {
+    // 1. 作品刪除申請列表
+    const delListEl = document.getElementById("delete-request-list");
+    const pendingDeletes = novelsData.filter(n => n.deleteRequested);
+    if (pendingDeletes.length === 0) {
+      delListEl.innerHTML = "<p>目前沒有待審核的作品刪除申請。</p>";
+    } else {
+      delListEl.innerHTML = pendingDeletes.map(n => `
+        <div class="novel-card" style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+          <div>
+            <strong>《${n.title}》</strong>（作者：${getDisplayAuthor(n)}）<br>
+            <span style="font-size:13px; color:#666;">申請帳號：${n.deleteRequestedBy || n.author} · ${n.deleteRequestedTime || ""}</span>
+          </div>
+          <div>
+            <button class="small danger" onclick="approveDeleteNovel('${n.id}', this)">核准刪除</button>
+            <button class="small secondary" onclick="rejectDeleteNovel('${n.id}', this)">駁回</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    // 2. 創作者資格申請列表
     const list = document.getElementById("applicant-list");
     const applicants = usersData.filter(u => u.appliedCreator && !u.canCreate);
     if (applicants.length === 0) {
@@ -1032,11 +1186,12 @@
             <strong>暱稱：${getUserNickname(u)}</strong>（帳號：${u.username}）<br>
             <span style="font-size:13px; color:#666;">信箱：${u.email}</span>
           </div>
-          <button class="small" onclick="approveCreator('${u.username}')">核准申請</button>
+          <button class="small" onclick="approveCreator('${u.username}', this)">核准申請</button>
         </div>
       `).join("");
     }
 
+    // 3. 所有會員帳號列表
     const allUsersEl = document.getElementById("all-users-list");
     if (!Array.isArray(usersData) || usersData.length === 0) {
       allUsersEl.innerHTML = "<p>目前尚無會員資料。</p>";
@@ -1055,16 +1210,18 @@
     }).join("");
   }
 
-  async function approveCreator(targetUsername) {
-    await loadAllData();
-    const u = usersData.find(user => user.username === targetUsername);
-    if (u) {
-      u.canCreate = true;
-      u.appliedCreator = false;
-      usersSha = await saveGitHubFile("password.json", usersData, usersSha, `Approve creator ${targetUsername}`);
-      alert(`已核准 ${targetUsername} 的創作權限！核准後對方即可填寫筆名與發表作品。`);
-      renderAdminPanel();
-    }
+  async function approveCreator(targetUsername, btnEl) {
+    await runSingleAction(btnEl, "核准中...", async () => {
+      await loadAllData();
+      const u = usersData.find(user => user.username === targetUsername);
+      if (u) {
+        u.canCreate = true;
+        u.appliedCreator = false;
+        usersSha = await saveGitHubFile("password.json", usersData, usersSha, `Approve creator ${targetUsername}`);
+        alert(`已核准 ${targetUsername} 的創作權限！核准後對方即可填寫筆名與發表作品。`);
+        renderAdminPanel();
+      }
+    });
   }
 </script>
 </body>
