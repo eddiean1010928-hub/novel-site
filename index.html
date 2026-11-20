@@ -23,7 +23,34 @@
     .novel-card { border: 1px solid var(--border); padding: 15px; border-radius: 8px; margin-bottom: 12px; }
     .novel-card h3 { margin-bottom: 5px; }
     .chapter-row { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ececef; padding: 8px 0; gap: 8px; flex-wrap: wrap; }
-    .reader-box { background: #faf8f5; padding: 20px; border-radius: 8px; border: 1px solid #e5e0d8; min-height: 450px; font-size: 18px; line-height: 1.8; white-space: pre-wrap; }
+
+    /* 字體大小控制列 */
+    .font-toolbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; background: #f2f2f7; padding: 8px 12px; border-radius: 8px; }
+    .font-toolbar span { font-size: 13px; color: #555; margin-right: 4px; }
+    .font-btn { width: auto; padding: 4px 10px; margin: 0; font-size: 13px; background: #ffffff; color: var(--text); border: 1px solid var(--border); font-weight: normal; }
+    .font-btn.active { background: var(--primary); color: #ffffff; border-color: var(--primary); font-weight: bold; }
+
+    /* 閱讀器容器與翻頁動畫 */
+    .reader-viewport { overflow: hidden; border-radius: 8px; }
+    .reader-box {
+      background: #faf8f5;
+      padding: 18px;
+      border-radius: 8px;
+      border: 1px solid #e5e0d8;
+      min-height: 440px;
+      font-size: 15px; /* 預設最小字體，貼近備忘錄閱讀比例 */
+      line-height: 1.75;
+      white-space: pre-wrap;
+      word-break: break-word;
+      transition: transform 0.22s ease, opacity 0.22s ease, font-size 0.15s ease;
+      transform: translateX(0);
+      opacity: 1;
+    }
+    .reader-box.slide-out-left { transform: translateX(-32px); opacity: 0; }
+    .reader-box.slide-out-right { transform: translateX(32px); opacity: 0; }
+    .reader-box.prep-in-right { transition: none; transform: translateX(32px); opacity: 0; }
+    .reader-box.prep-in-left { transition: none; transform: translateX(-32px); opacity: 0; }
+
     .pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; }
     .pagination button { width: 30%; }
     .badge { background: #e8f2ff; color: var(--primary); padding: 2px 8px; border-radius: 12px; font-size: 12px; }
@@ -45,7 +72,7 @@
     </div>
   </div>
 
-  <!-- 1. 登入 / 註冊區塊（已移除5位數字碼與註冊時筆名欄位） -->
+  <!-- 1. 登入 / 註冊區塊 -->
   <div id="auth-section">
     <h2 id="auth-title">登入系統</h2>
     <div id="login-form">
@@ -57,7 +84,7 @@
 
     <div id="register-form" class="hidden">
       <div class="notice">
-        一個電子郵件只能建立一個帳號；請勿使用常用重要密碼。若要發表作品與設定筆名，註冊後需向管理員申請創作權限。
+        一個電子郵件只能建立一個帳號；請勿使用常用重要密碼。註冊後即可直接登入閱讀；若要發表作品與設定筆名，需向管理員申請創作權限。
       </div>
       <input type="email" id="reg-email" placeholder="電子郵件（同個信箱不能創兩個帳號）">
       <input type="text" id="reg-user" placeholder="設定帳號">
@@ -69,7 +96,6 @@
 
   <!-- 2. 作品列表首頁 -->
   <div id="home-section" class="hidden">
-    <!-- 只有申請通過成為創作者（或站長）才會顯示筆名設定區塊 -->
     <div id="penname-panel" class="panel hidden" style="margin-top:0; margin-bottom:16px;">
       <strong>✍️ 寫作者筆名設定：</strong>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:6px;">
@@ -88,7 +114,7 @@
     <div id="novel-list">載入中...</div>
   </div>
 
-  <!-- 3. 單一作品畫面（在這裡才能按「編輯標題與簡介」、「編輯篇章」與「新增篇章」） -->
+  <!-- 3. 單一作品畫面 -->
   <div id="novel-detail-section" class="hidden">
     <button class="secondary small" onclick="showSection('home-section')">← 返回作品列表</button>
     <h2 id="detail-title"></h2>
@@ -117,7 +143,7 @@
     <div id="add-chapter-panel" class="panel hidden">
       <h3>新增篇章</h3>
       <input type="text" id="new-chapter-title" placeholder="篇章標題（例如：第一章 命運的開端）">
-      <textarea id="new-chapter-content" rows="10" placeholder="輸入篇章內文（約 20 行自動分一頁）..."></textarea>
+      <textarea id="new-chapter-content" rows="10" placeholder="輸入篇章內文（依你原本換行每 20 行自動分一頁）..."></textarea>
       <button onclick="addChapterToNovel()">發布此篇章</button>
       <button class="secondary" onclick="document.getElementById('add-chapter-panel').classList.add('hidden')">取消</button>
     </div>
@@ -142,20 +168,32 @@
     <input type="text" id="edit-novel-name" placeholder="請輸入新作品名稱">
     <textarea id="edit-novel-desc" rows="2" placeholder="作品簡介"></textarea>
     <input type="text" id="edit-chapter-title" placeholder="第一篇標題（例如：第一章 命運的開端）">
-    <textarea id="edit-chapter-content" rows="10" placeholder="請在此輸入小說內文（系統將自動按每約20行進行分頁）..."></textarea>
+    <textarea id="edit-chapter-content" rows="10" placeholder="請在此輸入小說內文（依你原本換行每 20 行自動分一頁）..."></textarea>
     <button onclick="publishNewNovel()">建立並發布</button>
   </div>
 
-  <!-- 5. 閱讀器區塊（約20行一頁） -->
+  <!-- 5. 閱讀器區塊（字體大小控制＋翻頁滑動動畫） -->
   <div id="reader-section" class="hidden">
     <button class="secondary small" onclick="backToNovelDetail()">← 回到作品畫面</button>
     <h2 id="reader-title"></h2>
     <p id="reader-meta" style="color:#666; font-size:14px;"></p>
-    <div id="reader-content" class="reader-box"></div>
+
+    <div class="font-toolbar">
+      <span>字體大小：</span>
+      <button type="button" class="font-btn active" data-size="15" onclick="setReaderFontSize(15)">小（預設）</button>
+      <button type="button" class="font-btn" data-size="17" onclick="setReaderFontSize(17)">中</button>
+      <button type="button" class="font-btn" data-size="19" onclick="setReaderFontSize(19)">大</button>
+      <button type="button" class="font-btn" data-size="21" onclick="setReaderFontSize(21)">特大</button>
+    </div>
+
+    <div class="reader-viewport">
+      <div id="reader-content" class="reader-box"></div>
+    </div>
+
     <div class="pagination">
-      <button onclick="changePage(-1)">上一頁</button>
+      <button id="btn-prev-page" onclick="changePage(-1)">上一頁</button>
       <span id="page-indicator">第 1 / 1 頁</span>
-      <button onclick="changePage(1)">下一頁</button>
+      <button id="btn-next-page" onclick="changePage(1)">下一頁</button>
     </div>
   </div>
 
@@ -185,15 +223,27 @@
   let novelsSha = "";
   let currentUser = null;
 
-  // 當前檢視的作品與章節狀態
   let currentNovelId = null;
   let editingChapterIndex = null;
 
-  // 閱讀器狀態
   let activeNovel = null;
   let activeChapterIdx = 0;
   let paginatedPages = [];
   let currentPage = 0;
+  let isAnimatingPage = false;
+
+  // 字體大小系統（預設最小 15px）
+  function setReaderFontSize(size) {
+    const validSizes = [15, 17, 19, 21];
+    const targetSize = validSizes.includes(Number(size)) ? Number(size) : 15;
+    const box = document.getElementById("reader-content");
+    if (box) box.style.fontSize = targetSize + "px";
+
+    document.querySelectorAll(".font-btn").forEach(btn => {
+      btn.classList.toggle("active", Number(btn.dataset.size) === targetSize);
+    });
+    localStorage.setItem("novel_reader_font_size", String(targetSize));
+  }
 
   function isOwnerAccount(username) {
     return username === CONFIG.OWNER_USER;
@@ -217,7 +267,6 @@
     return Boolean(currentUser.canCreate) && novel.author === currentUser.username;
   }
 
-  // GitHub API 讀取 JSON
   async function fetchGitHubFile(path) {
     const url = `https://api.github.com/repos/${CONFIG.GITHUB_OWNER}/${CONFIG.GITHUB_REPO}/contents/${path}?t=${Date.now()}`;
     const res = await fetch(url, {
@@ -232,7 +281,6 @@
     return { json: JSON.parse(content), sha: data.sha };
   }
 
-  // GitHub API 寫入 JSON
   async function saveGitHubFile(path, jsonData, sha, message) {
     const url = `https://api.github.com/repos/${CONFIG.GITHUB_OWNER}/${CONFIG.GITHUB_REPO}/contents/${path}`;
     const contentEncoded = btoa(unescape(encodeURIComponent(JSON.stringify(jsonData, null, 2))));
@@ -252,7 +300,6 @@
     return result.content.sha;
   }
 
-  // 初始化載入資料
   async function loadAllData() {
     try {
       const uRes = await fetchGitHubFile("password.json");
@@ -271,6 +318,9 @@
   }
 
   window.onload = async () => {
+    const savedFont = localStorage.getItem("novel_reader_font_size") || "15";
+    setReaderFontSize(savedFont);
+
     await loadAllData();
     const savedUser = localStorage.getItem("novel_logged_user");
     if (savedUser && Array.isArray(usersData)) {
@@ -285,7 +335,6 @@
     document.getElementById("auth-title").innerText = isReg ? "註冊新帳號" : "登入系統";
   }
 
-  // 註冊（不需5位數字碼、不填筆名；同信箱不能創兩個帳號）
   async function register() {
     const email = document.getElementById("reg-email").value.trim().toLowerCase();
     const username = document.getElementById("reg-user").value.trim();
@@ -403,7 +452,6 @@
     document.getElementById("auth-section").classList.add("hidden");
     document.getElementById("nav-buttons").classList.remove("hidden");
 
-    // 只有通過申請的創作者或站長才顯示「寫作者筆名設定」
     const canCreate = hasCreatorPermission(currentUser);
     document.getElementById("penname-panel").classList.toggle("hidden", !canCreate);
     if (canCreate) {
@@ -423,7 +471,6 @@
     showSection("home-section");
   }
 
-  // 僅限通過創作申請後才可填寫/修改筆名
   async function savePenname() {
     if (!hasCreatorPermission(currentUser)) {
       return alert("需先申請並通過創作權限後，才能設定筆名！");
@@ -691,25 +738,13 @@
     openNovelDetail(currentNovelId);
   }
 
+  // 保留你原本規劃的換行（每 20 行一頁，不再強制切斷你原本排好的行）
   function paginateText(text) {
-    const rawParagraphs = text.split("\n");
-    const visualLines = [];
-    const charsPerLine = 32;
-
-    rawParagraphs.forEach(p => {
-      if (p.trim() === "") {
-        visualLines.push("");
-      } else {
-        for (let i = 0; i < p.length; i += charsPerLine) {
-          visualLines.push(p.slice(i, i + charsPerLine));
-        }
-      }
-    });
-
+    const lines = text.split("\n");
     const linesPerPage = 20;
     const pages = [];
-    for (let i = 0; i < visualLines.length; i += linesPerPage) {
-      pages.push(visualLines.slice(i, i + linesPerPage).join("\n"));
+    for (let i = 0; i < lines.length; i += linesPerPage) {
+      pages.push(lines.slice(i, i + linesPerPage).join("\n"));
     }
     return pages.length > 0 ? pages : ["（本章節尚無內容）"];
   }
@@ -726,6 +761,9 @@
 
     document.getElementById("reader-title").innerText = `${activeNovel.title} - ${chapter.title}`;
     document.getElementById("reader-meta").innerText = `筆名：${getDisplayAuthor(activeNovel)} ｜ 本章共 ${paginatedPages.length} 頁`;
+
+    const savedFont = localStorage.getItem("novel_reader_font_size") || "15";
+    setReaderFontSize(savedFont);
 
     updateReaderView();
     showSection("reader-section");
@@ -747,12 +785,38 @@
     renderNovelList();
   }
 
+  // 滑順翻頁動畫（不會生硬直接跳過去）
+  function animateAndTurnPage(nextPageIndex, direction) {
+    if (isAnimatingPage) return;
+    isAnimatingPage = true;
+    const box = document.getElementById("reader-content");
+
+    box.classList.add(direction > 0 ? "slide-out-left" : "slide-out-right");
+
+    setTimeout(() => {
+      currentPage = nextPageIndex;
+      box.classList.remove("slide-out-left", "slide-out-right");
+      box.classList.add(direction > 0 ? "prep-in-right" : "prep-in-left");
+
+      updateReaderView();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          box.classList.remove("prep-in-right", "prep-in-left");
+          setTimeout(() => {
+            isAnimatingPage = false;
+          }, 230);
+        });
+      });
+    }, 200);
+  }
+
   function changePage(delta) {
+    if (isAnimatingPage) return;
     const next = currentPage + delta;
     if (next >= 0 && next < paginatedPages.length) {
-      currentPage = next;
-      updateReaderView();
-      window.scrollTo(0, 0);
+      animateAndTurnPage(next, delta);
     } else if (next >= paginatedPages.length && activeChapterIdx + 1 < activeNovel.chapters.length) {
       if (confirm("本章已讀完，是否前往下一章？")) {
         openReader(activeNovel.id, activeChapterIdx + 1, 0);
