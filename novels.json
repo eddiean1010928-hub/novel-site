@@ -51,14 +51,12 @@
     "penName": "安安",
     "ratings": {},
     "comments": [],
-    "deleteRequested": true,
+    "deleteRequested": false,
     "chapters": [
       {
         "title": "第一排",
         "content": "我"
       }
-    ],
-    "deleteRequestedBy": "eddiean1010928",
-    "deleteRequestedTime": "2026/11/21 15:34:39"
+    ]
   }
 ]
