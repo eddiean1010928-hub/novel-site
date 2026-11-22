@@ -29,9 +29,10 @@
     .star-btn { width: auto; padding: 4px 8px; margin: 0; font-size: 18px; background: #f2f2f7; color: #b0b0b8; border: 1px solid var(--border); border-radius: 6px; }
     .star-btn.active { background: #fff8e1; color: #f5a623; border-color: #f5a623; }
 
-    /* 公開留言區 */
+    /* 公開留言區 & 公共版貼文 */
     .comment-item { background: #f8f9fa; border: 1px solid #e5e5ea; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
-    .comment-meta { font-size: 12px; color: #666; margin-bottom: 4px; }
+    .comment-meta { font-size: 12px; color: #666; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .board-post { border: 1px solid var(--border); background: #fcfcfd; border-radius: 10px; padding: 14px; margin-bottom: 12px; }
 
     /* 字體大小控制列 */
     .font-toolbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; background: #f2f2f7; padding: 8px 12px; border-radius: 8px; }
@@ -82,6 +83,7 @@
     <div><strong id="nav-title">小說天地</strong> <span id="user-badge" class="badge hidden"></span></div>
     <div id="nav-buttons" class="hidden">
       <button onclick="showSection('home-section')">作品列表</button>
+      <button onclick="showSection('public-board-section')">公共版</button>
       <button id="btn-create-novel" onclick="handleCreateNovelClick()">建立新書</button>
       <button id="btn-admin" class="hidden secondary" onclick="showSection('admin-section')">會員與申請管理</button>
       <button class="danger" onclick="logout()">登出</button>
@@ -131,12 +133,33 @@
     <div id="novel-list">載入中...</div>
   </div>
 
+  <!-- 2.5 公共版區塊（僅創作者可發文，所有人皆可看） -->
+  <div id="public-board-section" class="hidden">
+    <h2>📢 創作者公共版</h2>
+    <p style="font-size:14px; color:#666;">由創作者發布的創作動態、更新預告與交流公告（所有會員皆可瀏覽）。</p>
+
+    <!-- 只有創作者或站長才顯示發文表單 -->
+    <div id="board-composer" class="panel hidden" style="margin-bottom:16px;">
+      <strong>✍️ 發布公共版貼文（創作者專屬）</strong>
+      <input type="text" id="board-post-title" placeholder="貼文標題（例如：新篇章預告 / 創作雜談）">
+      <textarea id="board-post-content" rows="4" placeholder="輸入想分享給讀者的內容..."></textarea>
+      <button id="btn-publish-board" class="small" onclick="publishBoardPost(this)">發布貼文</button>
+    </div>
+
+    <div id="board-readonly-hint" class="notice hidden">
+      目前為一般讀者模式，僅具備創作者權限的帳號可在此發文。
+    </div>
+
+    <div id="board-post-list">載入中...</div>
+  </div>
+
   <!-- 3. 單一作品畫面 -->
   <div id="novel-detail-section" class="hidden">
     <button class="secondary small" onclick="showSection('home-section')">← 返回作品列表</button>
     <h2 id="detail-title"></h2>
     <span id="detail-delete-status" class="badge warn hidden">刪除審核中</span>
     <p id="detail-author" style="color:var(--primary); font-weight:bold; margin:4px 0;"></p>
+    <p id="detail-views" style="font-size:14px; color:#555; margin:4px 0;"></p>
     <p id="detail-rating-summary" style="font-size:14px; font-weight:bold; margin:6px 0;"></p>
 
     <!-- 作品評分（滿分 5 顆星） -->
@@ -265,7 +288,8 @@
     TOKEN_PART1: "github_pat_11CTTY22Y0GvOULJTqrTKc_6Ye6JGKtBoU3As2",
     TOKEN_PART2: "AgrlvGpv1GWxHeLlFIXXS7zGro3JTC3WK7SUvBwRdyPl",
     OWNER_USER: "eddiean1010928",
-    OWNER_PASS: "eddie0928"
+    OWNER_PASS: "eddie0928",
+    BOARD_ID: "__PUBLIC_BOARD__"
   };
   const FULL_TOKEN = CONFIG.TOKEN_PART1 + CONFIG.TOKEN_PART2;
   // ============================================
@@ -276,7 +300,6 @@
   let novelsSha = "";
   let currentUser = null;
 
-  // 防連點與卡住鎖定狀態
   let isSaving = false;
 
   let currentNovelId = null;
@@ -288,7 +311,6 @@
   let currentPage = 0;
   let isAnimatingPage = false;
 
-  // 單次執行鎖定器：避免卡住時重複按很多下
   async function runSingleAction(btnEl, busyText, taskFn) {
     if (isSaving) return;
     isSaving = true;
@@ -366,6 +388,11 @@
     return user.nickname || user.username;
   }
 
+  function getCreatorDisplayName(user) {
+    if (!user) return "";
+    return user.penName || user.nickname || user.username;
+  }
+
   function getDisplayAuthor(novel) {
     const authorUser = Array.isArray(usersData)
       ? usersData.find(u => u.username === novel.author)
@@ -377,6 +404,19 @@
     if (!currentUser || !novel) return false;
     if (isOwnerAccount(currentUser.username)) return true;
     return Boolean(currentUser.canCreate) && novel.author === currentUser.username;
+  }
+
+  // 取得真正的小說清單（排除公共版系統節點）
+  function getRealNovels() {
+    if (!Array.isArray(novelsData)) return [];
+    return novelsData.filter(n => n.id !== CONFIG.BOARD_ID);
+  }
+
+  // 取得公共版貼文陣列
+  function getBoardPosts() {
+    if (!Array.isArray(novelsData)) return [];
+    const boardNode = novelsData.find(n => n.id === CONFIG.BOARD_ID);
+    return (boardNode && Array.isArray(boardNode.posts)) ? boardNode.posts : [];
   }
 
   async function fetchGitHubFile(path) {
@@ -571,6 +611,7 @@
 
     updateReaderApplyBanner();
     renderNovelList();
+    renderPublicBoard();
     showSection("home-section");
   }
 
@@ -594,7 +635,7 @@
 
       let novelChanged = false;
       novelsData.forEach(n => {
-        if (n.author === currentUser.username) {
+        if (n.id !== CONFIG.BOARD_ID && n.author === currentUser.username) {
           n.penName = newPen;
           novelChanged = true;
         }
@@ -648,14 +689,93 @@
   }
 
   function showSection(id) {
-    ["home-section", "novel-detail-section", "editor-section", "reader-section", "admin-section"].forEach(sec => {
+    ["home-section", "public-board-section", "novel-detail-section", "editor-section", "reader-section", "admin-section"].forEach(sec => {
       document.getElementById(sec).classList.add("hidden");
     });
     document.getElementById(id).classList.remove("hidden");
-    if (id === "admin-section" && isOwnerAccount(currentUser?.username)) {
+
+    if (id === "public-board-section") {
+      renderPublicBoard();
+    } else if (id === "admin-section" && isOwnerAccount(currentUser?.username)) {
       renderAdminPanel();
     }
   }
+
+  // ==================== 公共版功能 ====================
+  function renderPublicBoard() {
+    const canPost = hasCreatorPermission(currentUser);
+    document.getElementById("board-composer").classList.toggle("hidden", !canPost);
+    document.getElementById("board-readonly-hint").classList.toggle("hidden", canPost);
+
+    const listEl = document.getElementById("board-post-list");
+    const posts = getBoardPosts();
+    if (posts.length === 0) {
+      listEl.innerHTML = "<p style='color:#666;'>目前公共版尚無貼文。</p>";
+      return;
+    }
+
+    const isAdmin = isOwnerAccount(currentUser?.username);
+    listEl.innerHTML = posts.slice().reverse().map(post => {
+      const canDelete = isAdmin || (canPost && post.author === currentUser.username);
+      return `
+        <div class="board-post">
+          <div class="comment-meta">
+            <span><strong>✍️ ${post.authorDisplay}</strong>（${post.author}）· ${post.time || ""}</span>
+            ${canDelete ? `<button class="danger small" style="padding:3px 8px; font-size:12px;" onclick="deleteBoardPost('${post.id}', this)">刪除</button>` : ""}
+          </div>
+          <h3 style="margin:6px 0;">${post.title}</h3>
+          <div style="font-size:15px; white-space:pre-wrap; color:#222;">${post.content}</div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  async function publishBoardPost(btnEl) {
+    await runSingleAction(btnEl, "發布中...", async () => {
+      if (!hasCreatorPermission(currentUser)) {
+        return alert("只有創作者或站長才能在公共版發文！");
+      }
+      const title = document.getElementById("board-post-title").value.trim();
+      const content = document.getElementById("board-post-content").value.trim();
+      if (!title || !content) return alert("請填寫貼文標題與內容！");
+
+      await loadAllData();
+      let boardNode = novelsData.find(n => n.id === CONFIG.BOARD_ID);
+      if (!boardNode) {
+        boardNode = { id: CONFIG.BOARD_ID, posts: [] };
+        novelsData.push(boardNode);
+      }
+      boardNode.posts = Array.isArray(boardNode.posts) ? boardNode.posts : [];
+      boardNode.posts.push({
+        id: "post_" + Date.now(),
+        title,
+        content,
+        author: currentUser.username,
+        authorDisplay: getCreatorDisplayName(currentUser),
+        time: new Date().toLocaleString("zh-TW", { hour12: false })
+      });
+
+      novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `New public board post by ${currentUser.username}`);
+      document.getElementById("board-post-title").value = "";
+      document.getElementById("board-post-content").value = "";
+      renderPublicBoard();
+      alert("已發布至公共版！");
+    });
+  }
+
+  async function deleteBoardPost(postId, btnEl) {
+    await runSingleAction(btnEl, "刪除中...", async () => {
+      if (!confirm("確定要刪除這則公共版貼文嗎？")) return;
+      await loadAllData();
+      const boardNode = novelsData.find(n => n.id === CONFIG.BOARD_ID);
+      if (boardNode && Array.isArray(boardNode.posts)) {
+        boardNode.posts = boardNode.posts.filter(p => p.id !== postId);
+        novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Delete board post ${postId}`);
+      }
+      renderPublicBoard();
+    });
+  }
+  // ====================================================
 
   function getRatingSummary(novel) {
     const ratings = novel.ratings || {};
@@ -670,24 +790,26 @@
 
   function renderNovelList() {
     const listEl = document.getElementById("novel-list");
-    if (!Array.isArray(novelsData) || novelsData.length === 0) {
+    const realNovels = getRealNovels();
+    if (realNovels.length === 0) {
       listEl.innerHTML = "<p>目前尚無作品，快來建立第一部小說吧！</p>";
       return;
     }
 
-    listEl.innerHTML = novelsData.map(novel => {
+    listEl.innerHTML = realNovels.map(novel => {
       const prog = currentUser.progress[novel.id];
       const progText = prog
         ? `上次閱讀：第 ${prog.chapterIdx + 1} 章 (第 ${prog.page + 1} 頁)`
         : "尚未開始閱讀";
       const authorLabel = getDisplayAuthor(novel);
       const ratingInfo = getRatingSummary(novel);
+      const viewsCount = Number(novel.views) || 0;
       const delTag = novel.deleteRequested ? `<span class="badge warn">刪除審核中</span>` : "";
 
       return `
         <div class="novel-card">
           <h3>${novel.title} <span class="badge">作者：${authorLabel}</span> ${delTag}</h3>
-          <p style="font-size:13px; color:#d98200; font-weight:bold; margin:4px 0;">${ratingInfo.text}</p>
+          <p style="font-size:13px; color:#d98200; font-weight:bold; margin:4px 0;">${ratingInfo.text} ｜ 👁️ 閱讀次數：${viewsCount} 次</p>
           <p style="font-size:14px; color:#555;">${novel.description || "無簡介"}</p>
           <p style="font-size:13px; color:var(--primary); font-weight:bold;">📖 ${progText} ｜ 共 ${novel.chapters.length} 篇</p>
           <button class="small" onclick="openNovelDetail('${novel.id}')">進入作品</button>
@@ -713,7 +835,7 @@
     await runSingleAction(btnEl, null, async () => {
       if (!currentNovelId || !currentUser) return;
       await loadAllData();
-      const target = novelsData.find(n => n.id === currentNovelId);
+      const target = getRealNovels().find(n => n.id === currentNovelId);
       if (!target) return;
 
       target.ratings = target.ratings || {};
@@ -735,7 +857,7 @@
 
     listEl.innerHTML = comments.slice().reverse().map(c => `
       <div class="comment-item">
-        <div class="comment-meta"><strong>${c.nickname || c.username}</strong>（帳號：${c.username}）· ${c.time || ""}</div>
+        <div class="comment-meta"><span><strong>${c.nickname || c.username}</strong>（帳號：${c.username}）· ${c.time || ""}</span></div>
         <div style="font-size:15px; white-space:pre-wrap;">${c.text}</div>
       </div>
     `).join("");
@@ -748,7 +870,7 @@
       if (!text) return alert("請輸入留言內容！");
 
       await loadAllData();
-      const target = novelsData.find(n => n.id === currentNovelId);
+      const target = getRealNovels().find(n => n.id === currentNovelId);
       if (!target) return;
 
       target.comments = Array.isArray(target.comments) ? target.comments : [];
@@ -767,7 +889,7 @@
   }
 
   function openNovelDetail(novelId) {
-    const novel = novelsData.find(n => n.id === novelId);
+    const novel = getRealNovels().find(n => n.id === novelId);
     if (!novel) return;
     currentNovelId = novelId;
     editingChapterIndex = null;
@@ -779,6 +901,7 @@
     document.getElementById("detail-title").innerText = novel.title;
     document.getElementById("detail-delete-status").classList.toggle("hidden", !novel.deleteRequested);
     document.getElementById("detail-author").innerText = `作者：${getDisplayAuthor(novel)}`;
+    document.getElementById("detail-views").innerText = `👁️ 總閱讀次數：${Number(novel.views) || 0} 次`;
     document.getElementById("detail-desc").innerText = novel.description || "無簡介";
 
     updateRatingUI(novel);
@@ -825,17 +948,16 @@
     showSection("novel-detail-section");
   }
 
-  // 申請刪除作品（需站長審核）
   async function requestDeleteNovel(btnEl) {
     await runSingleAction(btnEl, "送出申請中...", async () => {
       if (!currentNovelId || !currentUser) return;
-      const novel = novelsData.find(n => n.id === currentNovelId);
+      const novel = getRealNovels().find(n => n.id === currentNovelId);
       if (!canEditNovel(novel)) return alert("只有作品作者或站長可以申請刪除！");
       if (novel.deleteRequested) return alert("此作品已經提出刪除申請，正在等待站長審核！");
       if (!confirm(`確定要申請刪除《${novel.title}》嗎？送出後需由站長審核確認。`)) return;
 
       await loadAllData();
-      const target = novelsData.find(n => n.id === currentNovelId);
+      const target = getRealNovels().find(n => n.id === currentNovelId);
       if (target) {
         target.deleteRequested = true;
         target.deleteRequestedBy = currentUser.username;
@@ -849,12 +971,11 @@
     });
   }
 
-  // 站長核准刪除作品
   async function approveDeleteNovel(novelId, btnEl) {
     await runSingleAction(btnEl, "刪除中...", async () => {
       if (!isOwnerAccount(currentUser?.username)) return;
       await loadAllData();
-      const target = novelsData.find(n => n.id === novelId);
+      const target = getRealNovels().find(n => n.id === novelId);
       if (!target) return;
       if (!confirm(`確定要永久刪除《${target.title}》嗎？`)) return;
 
@@ -871,12 +992,11 @@
     });
   }
 
-  // 站長駁回刪除申請
   async function rejectDeleteNovel(novelId, btnEl) {
     await runSingleAction(btnEl, "處理中...", async () => {
       if (!isOwnerAccount(currentUser?.username)) return;
       await loadAllData();
-      const target = novelsData.find(n => n.id === novelId);
+      const target = getRealNovels().find(n => n.id === novelId);
       if (!target) return;
 
       target.deleteRequested = false;
@@ -907,7 +1027,7 @@
   }
 
   function toggleEditNovelPanel() {
-    const novel = novelsData.find(n => n.id === currentNovelId);
+    const novel = getRealNovels().find(n => n.id === currentNovelId);
     if (!canEditNovel(novel)) return alert("只有作品作者或站長可以編輯！");
     const panel = document.getElementById("edit-novel-panel");
     document.getElementById("add-chapter-panel").classList.add("hidden");
@@ -919,7 +1039,7 @@
 
   async function saveNovelInfo(btnEl) {
     await runSingleAction(btnEl, "儲存中...", async () => {
-      const novel = novelsData.find(n => n.id === currentNovelId);
+      const novel = getRealNovels().find(n => n.id === currentNovelId);
       if (!canEditNovel(novel)) return;
 
       const newTitle = document.getElementById("edit-novel-title-input").value.trim();
@@ -927,7 +1047,7 @@
       if (!newTitle) return alert("作品標題不能為空！");
 
       await loadAllData();
-      const target = novelsData.find(n => n.id === currentNovelId);
+      const target = getRealNovels().find(n => n.id === currentNovelId);
       if (target) {
         target.title = newTitle;
         target.description = newDesc;
@@ -941,7 +1061,7 @@
   }
 
   function toggleAddChapterPanel() {
-    const novel = novelsData.find(n => n.id === currentNovelId);
+    const novel = getRealNovels().find(n => n.id === currentNovelId);
     if (!canEditNovel(novel)) return alert("只有作品作者或站長可以新增篇章！");
     const panel = document.getElementById("add-chapter-panel");
     document.getElementById("edit-novel-panel").classList.add("hidden");
@@ -951,7 +1071,7 @@
 
   async function addChapterToNovel(btnEl) {
     await runSingleAction(btnEl, "發布中...", async () => {
-      const novel = novelsData.find(n => n.id === currentNovelId);
+      const novel = getRealNovels().find(n => n.id === currentNovelId);
       if (!canEditNovel(novel)) return;
 
       const chTitle = document.getElementById("new-chapter-title").value.trim();
@@ -959,7 +1079,7 @@
       if (!chTitle || !chContent) return alert("篇章標題與內文不能為空！");
 
       await loadAllData();
-      const target = novelsData.find(n => n.id === currentNovelId);
+      const target = getRealNovels().find(n => n.id === currentNovelId);
       if (target) {
         target.chapters.push({ title: chTitle, content: chContent });
         novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Add chapter ${chTitle}`);
@@ -974,7 +1094,7 @@
   }
 
   function startEditChapter(idx) {
-    const novel = novelsData.find(n => n.id === currentNovelId);
+    const novel = getRealNovels().find(n => n.id === currentNovelId);
     if (!canEditNovel(novel) || !novel.chapters[idx]) return;
     editingChapterIndex = idx;
 
@@ -994,7 +1114,7 @@
 
   async function saveChapterEdit(btnEl) {
     await runSingleAction(btnEl, "儲存中...", async () => {
-      const novel = novelsData.find(n => n.id === currentNovelId);
+      const novel = getRealNovels().find(n => n.id === currentNovelId);
       if (!canEditNovel(novel) || editingChapterIndex === null) return;
 
       const newTitle = document.getElementById("edit-chapter-title-input").value.trim();
@@ -1002,7 +1122,7 @@
       if (!newTitle || !newContent) return alert("篇章標題與內文不能為空！");
 
       await loadAllData();
-      const target = novelsData.find(n => n.id === currentNovelId);
+      const target = getRealNovels().find(n => n.id === currentNovelId);
       if (target && target.chapters[editingChapterIndex]) {
         target.chapters[editingChapterIndex].title = newTitle;
         target.chapters[editingChapterIndex].content = newContent;
@@ -1025,8 +1145,26 @@
     return pages.length > 0 ? pages : ["（本章節尚無內容）"];
   }
 
-  function openReader(novelId, chapterIdx, startPage = 0) {
-    activeNovel = novelsData.find(n => n.id === novelId);
+  // 增加該作品閱讀次數（寫入 novels.json）
+  async function incrementNovelViews(novelId) {
+    const target = getRealNovels().find(n => n.id === novelId);
+    if (!target) return;
+    target.views = (Number(target.views) || 0) + 1;
+    renderNovelList();
+
+    if (isSaving) return;
+    isSaving = true;
+    try {
+      novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Increment views for ${target.title}`);
+    } catch (e) {
+      console.error("閱讀次數更新失敗：", e);
+    } finally {
+      isSaving = false;
+    }
+  }
+
+  async function openReader(novelId, chapterIdx, startPage = 0) {
+    activeNovel = getRealNovels().find(n => n.id === novelId);
     if (!activeNovel || !activeNovel.chapters[chapterIdx]) return;
     currentNovelId = novelId;
     activeChapterIdx = chapterIdx;
@@ -1041,8 +1179,9 @@
     const savedMode = localStorage.getItem("novel_reader_font_mode") || "xsmall25";
     setReaderFontMode(savedMode);
 
-    updateReaderView();
     showSection("reader-section");
+    await incrementNovelViews(novelId);
+    await updateReaderView();
   }
 
   async function updateReaderView() {
@@ -1136,6 +1275,7 @@
         description: novelDesc,
         author: currentUser.username,
         penName: currentUser.penName || getUserNickname(currentUser),
+        views: 0,
         ratings: {},
         comments: [],
         deleteRequested: false,
@@ -1154,9 +1294,8 @@
   }
 
   function renderAdminPanel() {
-    // 1. 作品刪除申請列表
     const delListEl = document.getElementById("delete-request-list");
-    const pendingDeletes = novelsData.filter(n => n.deleteRequested);
+    const pendingDeletes = getRealNovels().filter(n => n.deleteRequested);
     if (pendingDeletes.length === 0) {
       delListEl.innerHTML = "<p>目前沒有待審核的作品刪除申請。</p>";
     } else {
@@ -1174,7 +1313,6 @@
       `).join("");
     }
 
-    // 2. 創作者資格申請列表
     const list = document.getElementById("applicant-list");
     const applicants = usersData.filter(u => u.appliedCreator && !u.canCreate);
     if (applicants.length === 0) {
@@ -1191,7 +1329,6 @@
       `).join("");
     }
 
-    // 3. 所有會員帳號列表
     const allUsersEl = document.getElementById("all-users-list");
     if (!Array.isArray(usersData) || usersData.length === 0) {
       allUsersEl.innerHTML = "<p>目前尚無會員資料。</p>";
