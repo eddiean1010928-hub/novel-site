@@ -73,5 +73,22 @@
         "time": "2026/11/22 23:04:21"
       }
     ]
+  },
+  {
+    "id": "novel_1795438177967",
+    "title": "白癡",
+    "description": "",
+    "author": "Karolyn",
+    "penName": "1+",
+    "views": 0,
+    "ratings": {},
+    "comments": [],
+    "deleteRequested": false,
+    "chapters": [
+      {
+        "title": "誰是白痴",
+        "content": "第一幕：\n誰是白痴？\n：你\n全劇終"
+      }
+    ]
   }
 ]
