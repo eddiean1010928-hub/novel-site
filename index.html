@@ -304,11 +304,17 @@
       <label style="font-size:13px; font-weight:bold;">篇名</label>
       <input type="text" id="edit-part-only-title-input" placeholder="輸入篇名">
       <label style="font-size:13px; font-weight:bold;">篇類型（若此篇已有 2 話以上，無法改回單篇）</label>
-      <select id="edit-part-only-mode-select">
+      <select id="edit-part-only-mode-select" onchange="toggleSinglePartContentField()">
         <option value="multi">多話（需打開看話名）</option>
         <option value="single">單篇（不用打開，直接閱讀）</option>
       </select>
       <div id="edit-part-only-mode-hint" style="font-size:12px; color:#c62828; margin-bottom:6px;"></div>
+
+      <div id="single-part-content-group" class="hidden">
+        <label style="font-size:13px; font-weight:bold;">單篇內文</label>
+        <textarea id="edit-single-part-content-input" rows="10" placeholder="輸入單篇內文（依你原本換行每 20 行自動分一頁）..."></textarea>
+      </div>
+
       <button id="btn-save-part-only" class="success" onclick="savePartOnlyEdit(this)">儲存篇設定</button>
       <button class="secondary" onclick="cancelPartOnlyEdit()">取消</button>
     </div>
@@ -1583,6 +1589,13 @@
     });
   }
 
+  function toggleSinglePartContentField() {
+    const modeSelect = document.getElementById("edit-part-only-mode-select");
+    const contentGroup = document.getElementById("single-part-content-group");
+    if (!modeSelect || !contentGroup) return;
+    contentGroup.classList.toggle("hidden", modeSelect.value !== "single");
+  }
+
   function startEditPartOnly(partTitle) {
     const novel = getRealNovels().find(n => n.id === currentNovelId);
     if (!canEditNovel(novel)) return alert("只有作品作者或站長可以編輯篇！");
@@ -1602,6 +1615,7 @@
 
     const modeSelect = document.getElementById("edit-part-only-mode-select");
     const modeHint = document.getElementById("edit-part-only-mode-hint");
+    const singleContentInput = document.getElementById("edit-single-part-content-input");
 
     document.getElementById("editing-part-label").innerText = partTitle;
     document.getElementById("edit-part-only-title-input").value = partTitle;
@@ -1615,6 +1629,10 @@
       modeSelect.value = (matchedPart && matchedPart.partMode === "single") ? "single" : "multi";
       modeHint.innerText = "";
     }
+
+    const firstEp = matchedPart && matchedPart.episodes[0] ? matchedPart.episodes[0].ep : null;
+    singleContentInput.value = firstEp ? (firstEp.content || "") : "";
+    toggleSinglePartContentField();
 
     panel.scrollIntoView({ behavior: "smooth", block: "center" });
   }
@@ -1631,6 +1649,7 @@
 
       const newPartTitle = document.getElementById("edit-part-only-title-input").value.trim();
       const selectedMode = document.getElementById("edit-part-only-mode-select").value;
+      const singleContentVal = document.getElementById("edit-single-part-content-input").value;
       if (!newPartTitle) return alert("篇名不能為空！");
 
       await loadAllData();
@@ -1655,12 +1674,29 @@
           });
         }
 
-        (target.chapters || []).forEach(ch => {
+        const matchingIndices = [];
+        (target.chapters || []).forEach((ch, idx) => {
           if (getEpisodePartTitle(ch) === editingPartOriginalTitle) {
             ch.partTitle = newPartTitle;
             ch.partMode = selectedMode === "single" ? "single" : "multi";
+            matchingIndices.push(idx);
           }
         });
+
+        if (selectedMode === "single") {
+          if (matchingIndices.length > 0) {
+            const firstCh = target.chapters[matchingIndices[0]];
+            firstCh.title = newPartTitle;
+            firstCh.content = singleContentVal;
+          } else {
+            target.chapters.push({
+              partTitle: newPartTitle,
+              partMode: "single",
+              title: newPartTitle,
+              content: singleContentVal || "（尚未輸入內文）"
+            });
+          }
+        }
 
         novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Edit part ${newPartTitle}`);
       }
@@ -1843,7 +1879,11 @@
     currentPage = Math.min(Math.max(startPage, 0), paginatedPages.length - 1);
 
     const partName = getEpisodePartTitle(episode);
-    document.getElementById("reader-title").innerText = `${activeNovel.title} · ${partName} · ${episode.title}`;
+    const epTitle = (episode.title || "").trim();
+    const headerText = (!epTitle || epTitle === partName)
+      ? `${activeNovel.title} · ${partName}`
+      : `${activeNovel.title} · ${partName} · ${epTitle}`;
+    document.getElementById("reader-title").innerText = headerText;
     document.getElementById("reader-meta").innerText = `作者：${getDisplayAuthor(activeNovel)} ｜ 本話共 ${paginatedPages.length} 頁`;
 
     const savedMode = localStorage.getItem("novel_reader_font_mode") || "xsmall25";
