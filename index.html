@@ -13,7 +13,7 @@
     input, textarea, select, button { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid var(--border); border-radius: 8px; box-sizing: border-box; font-size: 16px; }
     button { background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; }
     button:hover { opacity: 0.9; }
-    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
     button.secondary { background: #6e6e73; }
     button.danger { background: #ff3b30; }
     button.success { background: #28a745; }
@@ -51,16 +51,16 @@
       display: flex;
       justify-content: flex-end;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       margin-top: 8px;
       width: 100%;
-      flex-wrap: nowrap;
+      flex-wrap: wrap;
     }
     .part-actions-right button {
       width: auto;
-      padding: 5px 10px;
+      padding: 5px 8px;
       margin: 0;
-      font-size: 13px;
+      font-size: 12px;
       white-space: nowrap;
       flex-shrink: 0;
     }
@@ -95,9 +95,9 @@
     }
     .episode-actions-right button {
       width: auto;
-      padding: 5px 9px;
+      padding: 5px 8px;
       margin: 0;
-      font-size: 13px;
+      font-size: 12px;
       white-space: nowrap;
       flex-shrink: 0;
     }
@@ -276,7 +276,7 @@
       <button class="secondary" onclick="document.getElementById('edit-novel-panel').classList.add('hidden')">取消</button>
     </div>
 
-    <!-- 新增篇面板（不用放話，只需選單篇／多篇與填篇名） -->
+    <!-- 新增篇面板 -->
     <div id="add-part-panel" class="panel hidden">
       <h3>新增篇</h3>
       <label style="font-size:13px; font-weight:bold;">篇類型（單篇不用打開直接讀；多話需打開看話名）</label>
@@ -290,7 +290,7 @@
       <button class="secondary" onclick="document.getElementById('add-part-panel').classList.add('hidden')">取消</button>
     </div>
 
-    <!-- 編輯「篇」面板（專門改篇名與單篇／多篇） -->
+    <!-- 編輯「篇」面板 -->
     <div id="edit-part-panel" class="panel hidden">
       <h3>編輯篇：<span id="editing-part-label" style="color:var(--primary);"></span></h3>
       <label style="font-size:13px; font-weight:bold;">篇名</label>
@@ -314,7 +314,7 @@
       <button class="secondary" onclick="cancelAddEpisode()">取消</button>
     </div>
 
-    <!-- 編輯指定「話」面板（只有話名與內文，沒有篇名與單篇／多篇設定） -->
+    <!-- 編輯指定「話」面板 -->
     <div id="edit-episode-panel" class="panel hidden">
       <h3>編輯話：<span id="editing-episode-label"></span></h3>
       <label style="font-size:13px; font-weight:bold;">話名</label>
@@ -1187,16 +1187,15 @@
 
     const canManage = canEditNovel(novel);
 
-    partsListEl.innerHTML = parts.map((part) => {
+    partsListEl.innerHTML = parts.map((part, partIdx) => {
       const isSinglePart = part.partMode === "single" && part.episodes.length <= 1;
       const safePartTitle = part.partTitle.replace(/'/g, "\\'");
+      const isFirstPart = partIdx === 0;
+      const isLastPart = partIdx === parts.length - 1;
+      const firstEpIdx = part.episodes.length > 0 ? part.episodes[0].epIdx : -1;
 
       if (isSinglePart) {
-        const firstItem = part.episodes[0];
-        const epIdx = firstItem ? firstItem.epIdx : -1;
-        const isFirstAll = epIdx <= 0;
-        const isLastAll = epIdx === -1 || epIdx >= novel.chapters.length - 1;
-        const epProg = epIdx >= 0 ? currentUser.episodeProgress?.[novel.id]?.[epIdx] : null;
+        const epProg = firstEpIdx >= 0 ? currentUser.episodeProgress?.[novel.id]?.[firstEpIdx] : null;
         const epProgBadge = epProg ? `<span class="badge">第 ${epProg.page + 1} 頁</span>` : "";
 
         return `
@@ -1206,12 +1205,15 @@
               <div class="part-count-badge">${epProgBadge} <span class="badge">單篇</span></div>
             </div>
             <div class="episode-actions-right" style="margin-top:8px;">
-              ${epIdx >= 0 ? `<button onclick="openReader('${novel.id}', ${epIdx}, 0)">閱讀</button>` : ""}
               ${canManage ? `
-                <button class="secondary" ${isFirstAll ? "disabled" : ""} onclick="moveEpisodeOrder('${novel.id}', ${epIdx}, -1, this)">上移</button>
-                <button class="secondary" ${isLastAll ? "disabled" : ""} onclick="moveEpisodeOrder('${novel.id}', ${epIdx}, 1, this)">下移</button>
+                <button class="secondary" ${isFirstPart ? "disabled" : ""} onclick="movePartOrder('${novel.id}', '${safePartTitle}', -1, this)">上</button>
+                <button class="secondary" ${isLastPart ? "disabled" : ""} onclick="movePartOrder('${novel.id}', '${safePartTitle}', 1, this)">下</button>
+              ` : ""}
+              <button ${firstEpIdx >= 0 ? `onclick="openReader('${novel.id}', ${firstEpIdx}, 0)"` : "disabled"}>閱讀</button>
+              ${canManage ? `
                 <button class="secondary" onclick="startEditPartOnly('${safePartTitle}')">編輯</button>
                 <button onclick="startAddEpisodeInPart('${safePartTitle}')">新增</button>
+                <button class="danger" onclick="deletePartByTitle('${novel.id}', '${safePartTitle}', this)">刪除</button>
               ` : ""}
             </div>
           </div>
@@ -1233,12 +1235,14 @@
               ${epProgBadge}
             </div>
             <div class="episode-actions-right">
+              ${canManage ? `
+                <button class="secondary" ${isFirst ? "disabled" : ""} onclick="moveEpisodeOrder('${novel.id}', ${epIdx}, -1, this)">上</button>
+                <button class="secondary" ${isLast ? "disabled" : ""} onclick="moveEpisodeOrder('${novel.id}', ${epIdx}, 1, this)">下</button>
+              ` : ""}
               <button onclick="openReader('${novel.id}', ${epIdx}, 0)">閱讀</button>
               ${canManage ? `
-                <button class="secondary" ${isFirst ? "disabled" : ""} onclick="moveEpisodeOrder('${novel.id}', ${epIdx}, -1, this)">上移</button>
-                <button class="secondary" ${isLast ? "disabled" : ""} onclick="moveEpisodeOrder('${novel.id}', ${epIdx}, 1, this)">下移</button>
                 <button class="secondary" onclick="startEditEpisode(${epIdx})">編輯</button>
-                <button onclick="startAddEpisodeInPart('${safePartTitle}')">新增</button>
+                <button class="danger" onclick="deleteEpisodeByIndex('${novel.id}', ${epIdx}, this)">刪除</button>
               ` : ""}
             </div>
           </div>
@@ -1253,8 +1257,14 @@
           </div>
           <div class="part-actions-right">
             ${canManage ? `
+              <button class="secondary" ${isFirstPart ? "disabled" : ""} onclick="movePartOrder('${novel.id}', '${safePartTitle}', -1, this)">上</button>
+              <button class="secondary" ${isLastPart ? "disabled" : ""} onclick="movePartOrder('${novel.id}', '${safePartTitle}', 1, this)">下</button>
+            ` : ""}
+            <button ${firstEpIdx >= 0 ? `onclick="openReader('${novel.id}', ${firstEpIdx}, 0)"` : "disabled"}>閱讀</button>
+            ${canManage ? `
               <button class="secondary" onclick="startEditPartOnly('${safePartTitle}')">編輯</button>
               <button onclick="startAddEpisodeInPart('${safePartTitle}')">新增話</button>
+              <button class="danger" onclick="deletePartByTitle('${novel.id}', '${safePartTitle}', this)">刪除</button>
             ` : ""}
             <button class="secondary" onclick="togglePartExpand('${part.partKey}')">
               ${isExpanded ? "收起話名 ▲" : "打開話名 ▼"}
@@ -1266,6 +1276,75 @@
         </div>
       `;
     }).join("");
+  }
+
+  // 調整「篇」的上下順序
+  async function movePartOrder(novelId, partTitle, direction, btnEl) {
+    await runSingleAction(btnEl, "排序中...", async () => {
+      await loadAllData();
+      const target = getRealNovels().find(n => n.id === novelId);
+      if (!target || !canEditNovel(target)) return;
+
+      const parts = groupNovelIntoParts(target);
+      const currentIdx = parts.findIndex(p => p.partTitle === partTitle);
+      const swapIdx = currentIdx + direction;
+      if (currentIdx === -1 || swapIdx < 0 || swapIdx >= parts.length) return;
+
+      const reorderedParts = parts.slice();
+      const tmp = reorderedParts[currentIdx];
+      reorderedParts[currentIdx] = reorderedParts[swapIdx];
+      reorderedParts[swapIdx] = tmp;
+
+      const newChapters = [];
+      const newPartsMeta = [];
+      reorderedParts.forEach(p => {
+        newPartsMeta.push({ partTitle: p.partTitle, partMode: p.partMode });
+        p.episodes.forEach(item => {
+          newChapters.push(item.ep);
+        });
+      });
+
+      target.partsMeta = newPartsMeta;
+      target.chapters = newChapters;
+
+      novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Reorder part ${partTitle} in ${target.title}`);
+      renderNovelList();
+      openNovelDetail(novelId);
+    });
+  }
+
+  // 刪除整「篇」
+  async function deletePartByTitle(novelId, partTitle, btnEl) {
+    await runSingleAction(btnEl, "刪除中...", async () => {
+      await loadAllData();
+      const target = getRealNovels().find(n => n.id === novelId);
+      if (!target || !canEditNovel(target)) return;
+      if (!confirm(`確定要刪除「${partTitle}」這一篇嗎？（該篇底下的話也會一併刪除）`)) return;
+
+      target.partsMeta = (target.partsMeta || []).filter(m => m.partTitle !== partTitle);
+      target.chapters = (target.chapters || []).filter(ep => getEpisodePartTitle(ep) !== partTitle);
+
+      novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Delete part ${partTitle} in ${target.title}`);
+      renderNovelList();
+      openNovelDetail(novelId);
+    });
+  }
+
+  // 刪除單一「話」
+  async function deleteEpisodeByIndex(novelId, epIdx, btnEl) {
+    await runSingleAction(btnEl, "刪除中...", async () => {
+      await loadAllData();
+      const target = getRealNovels().find(n => n.id === novelId);
+      if (!target || !canEditNovel(target) || !target.chapters[epIdx]) return;
+      const epTitle = target.chapters[epIdx].title || `第 ${epIdx + 1} 話`;
+      if (!confirm(`確定要刪除「${epTitle}」嗎？`)) return;
+
+      target.chapters.splice(epIdx, 1);
+
+      novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Delete episode ${epTitle} in ${target.title}`);
+      renderNovelList();
+      openNovelDetail(novelId);
+    });
   }
 
   async function moveEpisodeOrder(novelId, epIdx, direction, btnEl) {
@@ -1471,7 +1550,6 @@
     panel.classList.toggle("hidden");
   }
 
-  // 新增篇：不用放話，建立篇與單篇／多篇設定
   async function addPartToNovel(btnEl) {
     await runSingleAction(btnEl, "建立中...", async () => {
       const novel = getRealNovels().find(n => n.id === currentNovelId);
@@ -1500,7 +1578,6 @@
     });
   }
 
-  // 篇的編輯面板：專門修改篇名與單篇／多篇模式
   function startEditPartOnly(partTitle) {
     const novel = getRealNovels().find(n => n.id === currentNovelId);
     if (!canEditNovel(novel)) return alert("只有作品作者或站長可以編輯篇！");
@@ -1665,7 +1742,6 @@
     });
   }
 
-  // 話的編輯面板：只編輯話名與內文，不含篇名與單篇／多篇選項
   function startEditEpisode(idx) {
     const novel = getRealNovels().find(n => n.id === currentNovelId);
     if (!canEditNovel(novel) || !novel.chapters[idx]) return;
