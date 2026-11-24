@@ -26,10 +26,78 @@
     /* 篇與話階層樣式 */
     .parts-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
     .part-card { border: 1px solid var(--border); background: #fafafd; border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
-    .part-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+    /* 篇標題列：單行不換行，過長自動省略，話數標籤固定在最右側 */
+    .part-title-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      width: 100%;
+    }
+    .part-title-text {
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-weight: bold;
+      font-size: 15px;
+    }
+    .part-count-badge {
+      flex-shrink: 0;
+    }
+
+    /* 篇右側操作列（新增話、打開話名）靠右對齊 */
+    .part-actions-right {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
+      width: 100%;
+    }
+    .part-actions-right button {
+      margin: 0;
+    }
+
     .episode-list { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #d2d2d7; }
-    .chapter-row { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ececef; padding: 8px 0; gap: 8px; flex-wrap: wrap; }
-    .chapter-row:last-child { border-bottom: none; }
+    .chapter-row { border-bottom: 1px solid #ececef; padding: 10px 0; }
+    .chapter-row:last-child { border-bottom: none; padding-bottom: 2px; }
+    .chapter-title-line {
+      font-weight: bold;
+      font-size: 15px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .chapter-title-text {
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* 話的操作按鈕列：「閱讀」「上移」「下移」「編輯」「新增」一排並全部靠右 */
+    .episode-actions-right {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: nowrap;
+      width: 100%;
+    }
+    .episode-actions-right button {
+      width: auto;
+      padding: 5px 9px;
+      margin: 0;
+      font-size: 13px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
 
     /* 評分星星 */
     .rating-box { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
@@ -76,7 +144,7 @@
 
     .pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; }
     .pagination button { width: 30%; }
-    .badge { background: #e8f2ff; color: var(--primary); padding: 2px 8px; border-radius: 12px; font-size: 12px; }
+    .badge { background: #e8f2ff; color: var(--primary); padding: 2px 8px; border-radius: 12px; font-size: 12px; white-space: nowrap; }
     .badge.warn { background: #fff3cd; color: #856404; }
     .notice { background: #f2f6fc; border-left: 4px solid var(--primary); padding: 10px 14px; border-radius: 6px; font-size: 14px; margin-bottom: 12px; }
     .panel { background: #fafafa; border: 1px solid var(--border); padding: 15px; border-radius: 10px; margin-top: 14px; }
@@ -220,7 +288,7 @@
       <button class="secondary" onclick="document.getElementById('add-part-panel').classList.add('hidden')">取消</button>
     </div>
 
-    <!-- 新增話面板（從打開的篇內「新增話」按鈕觸發，固定歸屬在該篇） -->
+    <!-- 新增話面板 -->
     <div id="add-episode-panel" class="panel hidden">
       <h3>新增話至：<span id="adding-episode-part-label" style="color:var(--primary);"></span></h3>
       <input type="text" id="new-episode-title" placeholder="話名（必填，例如：第二話 暗影浮現）">
@@ -369,7 +437,7 @@
   let currentPage = 0;
   let isAnimatingPage = false;
   let pageScrollMode = "top";
-  let paragraphIndentMode = "indent2"; // "indent2" | "none"
+  let paragraphIndentMode = "indent2";
 
   function nowText() {
     return new Date().toLocaleString("zh-TW", { hour12: false });
@@ -531,7 +599,6 @@
       const lastPart = parts[parts.length - 1];
       if (lastPart && lastPart.partTitle === partName) {
         lastPart.episodes.push({ ep, epIdx });
-        // 若同篇已超過 1 話，強制視為多話
         if (lastPart.episodes.length > 1) {
           lastPart.partMode = "multi";
         }
@@ -1090,55 +1157,57 @@
 
     partsListEl.innerHTML = parts.map((part) => {
       const isSinglePart = part.partMode === "single" && part.episodes.length === 1;
+      const safePartTitle = part.partTitle.replace(/'/g, "\\'");
 
-      // 單篇模式且只有 1 話：不用打開，直接閱讀
+      // 單篇模式且只有 1 話：不用打開，直接閱讀；操作列「閱讀」「上移」「下移」「編輯」「新增」一排靠右
       if (isSinglePart) {
         const { ep, epIdx } = part.episodes[0];
+        const isFirstAll = epIdx === 0;
+        const isLastAll = epIdx === novel.chapters.length - 1;
         const epProg = currentUser.episodeProgress?.[novel.id]?.[epIdx];
-        const epProgBadge = epProg ? `<span class="badge">已讀至第 ${epProg.page + 1} 頁</span>` : "";
-        const safePartTitle = part.partTitle.replace(/'/g, "\\'");
+        const epProgBadge = epProg ? `<span class="badge">第 ${epProg.page + 1} 頁</span>` : "";
 
         return `
           <div class="part-card">
-            <div class="part-header">
-              <div>
-                <strong>📄 ${part.partTitle}</strong>
-                <span class="badge">單篇</span> ${epProgBadge}
-              </div>
-              <div>
-                <button class="small" onclick="openReader('${novel.id}', ${epIdx}, 0)">直接閱讀</button>
-                ${canManage ? `
-                  <button class="small secondary" onclick="startEditEpisode(${epIdx})">編輯</button>
-                  <button class="small" onclick="startAddEpisodeInPart('${safePartTitle}')">＋ 新增話</button>
-                ` : ""}
-              </div>
+            <div class="part-title-line">
+              <div class="part-title-text" title="${part.partTitle}">📄 ${part.partTitle}</div>
+              <div class="part-count-badge">${epProgBadge} <span class="badge">單篇</span></div>
+            </div>
+            <div class="episode-actions-right" style="margin-top:8px;">
+              <button onclick="openReader('${novel.id}', ${epIdx}, 0)">閱讀</button>
+              ${canManage ? `
+                <button class="secondary" ${isFirstAll ? "disabled" : ""} onclick="moveEpisodeOrder('${novel.id}', ${epIdx}, -1, this)">上移</button>
+                <button class="secondary" ${isLastAll ? "disabled" : ""} onclick="moveEpisodeOrder('${novel.id}', ${epIdx}, 1, this)">下移</button>
+                <button class="secondary" onclick="startEditEpisode(${epIdx})">編輯</button>
+                <button onclick="startAddEpisodeInPart('${safePartTitle}')">新增</button>
+              ` : ""}
             </div>
           </div>
         `;
       }
 
-      // 多話模式：可打開／收合查看話名
+      // 多話模式：篇名與「X 話」固定同一排（篇名過長自動省略，話數標籤永遠在最後面）；下方「新增話」與「打開話名」全部靠右
       const isExpanded = expandedPartKeys.has(part.partKey);
-      const safePartTitle = part.partTitle.replace(/'/g, "\\'");
 
       const epRowsHtml = part.episodes.map(({ ep, epIdx }, idxInPart) => {
         const isFirst = idxInPart === 0;
         const isLast = idxInPart === part.episodes.length - 1;
         const epProg = currentUser.episodeProgress?.[novel.id]?.[epIdx];
-        const epProgBadge = epProg ? `<span class="badge">已讀至第 ${epProg.page + 1} 頁</span>` : "";
+        const epProgBadge = epProg ? `<span class="badge">第 ${epProg.page + 1} 頁</span>` : "";
 
         return `
           <div class="chapter-row">
-            <div>
-              <strong>${ep.title}</strong> ${epProgBadge}
+            <div class="chapter-title-line">
+              <div class="chapter-title-text" title="${ep.title}">${ep.title}</div>
+              ${epProgBadge}
             </div>
-            <div>
-              <button class="small" onclick="openReader('${novel.id}', ${epIdx}, 0)">閱讀</button>
+            <div class="episode-actions-right">
+              <button onclick="openReader('${novel.id}', ${epIdx}, 0)">閱讀</button>
               ${canManage ? `
-                <button class="small secondary" ${isFirst ? "disabled" : ""} onclick="moveEpisodeOrder('${novel.id}', ${epIdx}, -1, this)">↑ 上移</button>
-                <button class="small secondary" ${isLast ? "disabled" : ""} onclick="moveEpisodeOrder('${novel.id}', ${epIdx}, 1, this)">↓ 下移</button>
-                <button class="small secondary" onclick="startEditEpisode(${epIdx})">編輯</button>
-                <button class="small" onclick="startAddEpisodeInPart('${safePartTitle}')">＋ 新增話</button>
+                <button class="secondary" ${isFirst ? "disabled" : ""} onclick="moveEpisodeOrder('${novel.id}', ${epIdx}, -1, this)">上移</button>
+                <button class="secondary" ${isLast ? "disabled" : ""} onclick="moveEpisodeOrder('${novel.id}', ${epIdx}, 1, this)">下移</button>
+                <button class="secondary" onclick="startEditEpisode(${epIdx})">編輯</button>
+                <button onclick="startAddEpisodeInPart('${safePartTitle}')">新增</button>
               ` : ""}
             </div>
           </div>
@@ -1147,17 +1216,15 @@
 
       return `
         <div class="part-card">
-          <div class="part-header">
-            <div>
-              <strong>📚 ${part.partTitle}</strong>
-              <span class="badge">${part.episodes.length} 話</span>
-            </div>
-            <div>
-              ${canManage ? `<button class="small" onclick="startAddEpisodeInPart('${safePartTitle}')">＋ 新增話</button>` : ""}
-              <button class="small secondary" onclick="togglePartExpand('${part.partKey}')">
-                ${isExpanded ? "收起話名 ▲" : "打開話名 ▼"}
-              </button>
-            </div>
+          <div class="part-title-line">
+            <div class="part-title-text" title="${part.partTitle}">📚 ${part.partTitle}</div>
+            <span class="badge part-count-badge">${part.episodes.length} 話</span>
+          </div>
+          <div class="part-actions-right">
+            ${canManage ? `<button class="small" onclick="startAddEpisodeInPart('${safePartTitle}')">＋ 新增話</button>` : ""}
+            <button class="small secondary" onclick="togglePartExpand('${part.partKey}')">
+              ${isExpanded ? "收起話名 ▲" : "打開話名 ▼"}
+            </button>
           </div>
           <div class="episode-list ${isExpanded ? "" : "hidden"}">
             ${epRowsHtml}
@@ -1179,11 +1246,9 @@
       const movingEp = target.chapters[epIdx];
       const neighborEp = target.chapters[swapIdx];
       const neighborPart = getEpisodePartTitle(neighborEp);
-      if (getEpisodePartTitle(movingEp) !== neighborPart) {
+      if (movingEp.partMode !== "single" && getEpisodePartTitle(movingEp) !== neighborPart) {
         movingEp.partTitle = neighborPart;
       }
-      movingEp.partMode = "multi";
-      neighborEp.partMode = "multi";
 
       const temp = target.chapters[epIdx];
       target.chapters[epIdx] = target.chapters[swapIdx];
@@ -1357,7 +1422,6 @@
     });
   }
 
-  // 上方「新增篇」
   function toggleAddPartPanel() {
     const novel = getRealNovels().find(n => n.id === currentNovelId);
     if (!canEditNovel(novel)) return alert("只有作品作者或站長可以新增篇！");
@@ -1403,7 +1467,6 @@
     });
   }
 
-  // 打開後「新增話」
   function startAddEpisodeInPart(partTitle) {
     const novel = getRealNovels().find(n => n.id === currentNovelId);
     if (!canEditNovel(novel)) return alert("只有作品作者或站長可以新增話！");
@@ -1438,7 +1501,6 @@
       await loadAllData();
       const target = getRealNovels().find(n => n.id === currentNovelId);
       if (target) {
-        // 該篇新增話後，同篇一律轉為多話模式
         target.chapters.forEach(ep => {
           if (getEpisodePartTitle(ep) === addingToPartTitle) {
             ep.partMode = "multi";
@@ -1498,6 +1560,7 @@
     document.getElementById("edit-part-title-input").value = ep.partTitle || "";
     document.getElementById("edit-episode-title-input").value = ep.title;
     document.getElementById("edit-episode-content-input").value = ep.content;
+    document.getElementById("edit-episode-panel").scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   function cancelEpisodeEdit() {
