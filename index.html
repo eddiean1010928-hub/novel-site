@@ -24,6 +24,7 @@
     .novel-card h3 { margin-bottom: 5px; }
 
     /* 篇與話階層樣式 */
+    .parts-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
     .part-card { border: 1px solid var(--border); background: #fafafd; border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
     .part-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
     .episode-list { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #d2d2d7; }
@@ -43,8 +44,8 @@
     /* 字體大小與翻頁位置控制列 */
     .font-toolbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; background: #f2f2f7; padding: 8px 12px; border-radius: 8px; }
     .font-toolbar span { font-size: 13px; color: #555; margin-right: 4px; }
-    .font-btn, .scroll-mode-btn { width: auto; padding: 4px 10px; margin: 0; font-size: 13px; background: #ffffff; color: var(--text); border: 1px solid var(--border); font-weight: normal; }
-    .font-btn.active, .scroll-mode-btn.active { background: var(--primary); color: #ffffff; border-color: var(--primary); font-weight: bold; }
+    .font-btn, .scroll-mode-btn, .indent-btn { width: auto; padding: 4px 10px; margin: 0; font-size: 13px; background: #ffffff; color: var(--text); border: 1px solid var(--border); font-weight: normal; }
+    .font-btn.active, .scroll-mode-btn.active, .indent-btn.active { background: var(--primary); color: #ffffff; border-color: var(--primary); font-weight: bold; }
     .layout-tag { font-size: 12px; color: #0066cc; background: #e8f2ff; padding: 4px 10px; border-radius: 6px; display: inline-block; margin-bottom: 10px; }
 
     /* 閱讀器容器與翻頁動畫 */
@@ -186,9 +187,10 @@
     <p id="detail-progress" style="font-size:14px; font-weight:bold; margin-top:12px;"></p>
     <button id="btn-detail-continue" class="success hidden" onclick="continueActiveNovel()">繼續上次進度閱讀</button>
 
+    <!-- 上方操作列：編輯標題與簡介、新增篇、申請刪除 -->
     <div id="author-novel-actions" class="hidden" style="margin-top:10px;">
       <button class="secondary small" onclick="toggleEditNovelPanel()">編輯標題與簡介</button>
-      <button class="small" onclick="toggleAddEpisodePanel()">新增篇 / 話</button>
+      <button class="small" onclick="toggleAddPartPanel()">＋ 新增篇</button>
       <button id="btn-apply-delete-novel" class="danger small" onclick="requestDeleteNovel(this)">申請刪除作品</button>
     </div>
 
@@ -203,25 +205,41 @@
       <button class="secondary" onclick="document.getElementById('edit-novel-panel').classList.add('hidden')">取消</button>
     </div>
 
-    <!-- 新增篇 / 話面板 -->
-    <div id="add-episode-panel" class="panel hidden">
-      <h3>新增篇 / 話</h3>
-      <label style="font-size:13px; font-weight:bold;">所屬篇名（可選現有篇，或輸入新篇名；若不填篇名則預設同話名）</label>
-      <select id="select-existing-part" onchange="onSelectPartChange()">
-        <option value="__NEW__">＋ 建立新篇（可自訂篇名）</option>
+    <!-- 新增篇面板（上方） -->
+    <div id="add-part-panel" class="panel hidden">
+      <h3>新增篇</h3>
+      <label style="font-size:13px; font-weight:bold;">篇類型（單篇不用打開直接讀；多話需打開看話名）</label>
+      <select id="new-part-type">
+        <option value="multi">多話（需打開看話名）</option>
+        <option value="single">單篇（不用打開，直接閱讀）</option>
       </select>
-      <input type="text" id="new-part-title" placeholder="篇名（選填，例如：第一篇 命運啟程；留空則同話名）">
-      <input type="text" id="new-episode-title" placeholder="話名（必填，例如：第一話 少年與星光）">
-      <textarea id="new-episode-content" rows="10" placeholder="輸入內文（依你原本換行每 20 行自動分一頁）..."></textarea>
-      <button id="btn-add-episode" onclick="addEpisodeToNovel(this)">發布此話</button>
-      <button class="secondary" onclick="document.getElementById('add-episode-panel').classList.add('hidden')">取消</button>
+      <input type="text" id="new-part-title" placeholder="篇名（選填，留空則同第一話話名）">
+      <input type="text" id="new-part-first-episode" placeholder="第一話話名（必填，例如：第一話 命運啟程）">
+      <textarea id="new-part-content" rows="10" placeholder="輸入內文（依你原本換行每 20 行自動分一頁）..."></textarea>
+      <button id="btn-add-part" onclick="addPartToNovel(this)">建立此篇</button>
+      <button class="secondary" onclick="document.getElementById('add-part-panel').classList.add('hidden')">取消</button>
     </div>
 
-    <!-- 編輯指定話面板 -->
+    <!-- 新增話面板（從打開的篇內「新增話」按鈕觸發，固定歸屬在該篇） -->
+    <div id="add-episode-panel" class="panel hidden">
+      <h3>新增話至：<span id="adding-episode-part-label" style="color:var(--primary);"></span></h3>
+      <input type="text" id="new-episode-title" placeholder="話名（必填，例如：第二話 暗影浮現）">
+      <textarea id="new-episode-content" rows="10" placeholder="輸入內文（依你原本換行每 20 行自動分一頁）..."></textarea>
+      <button id="btn-add-episode" onclick="addEpisodeToCurrentPart(this)">發布此話</button>
+      <button class="secondary" onclick="cancelAddEpisode()">取消</button>
+    </div>
+
+    <!-- 編輯指定話 / 篇設定面板 -->
     <div id="edit-episode-panel" class="panel hidden">
       <h3>編輯內容：<span id="editing-episode-label"></span></h3>
-      <label style="font-size:13px; font-weight:bold;">篇名（可自由修改，留空則同話名）</label>
+      <label style="font-size:13px; font-weight:bold;">篇名（留空則同話名）</label>
       <input type="text" id="edit-part-title-input" placeholder="篇名">
+      <label style="font-size:13px; font-weight:bold;">此篇模式（若此篇已有 2 話以上，無法改回單篇）</label>
+      <select id="edit-part-mode-select">
+        <option value="multi">多話（需打開看話名）</option>
+        <option value="single">單篇（不用打開，直接閱讀）</option>
+      </select>
+      <div id="edit-part-mode-hint" style="font-size:12px; color:#c62828; margin-bottom:6px;"></div>
       <label style="font-size:13px; font-weight:bold;">話名</label>
       <input type="text" id="edit-episode-title-input" placeholder="話名">
       <label style="font-size:13px; font-weight:bold;">內文</label>
@@ -230,7 +248,13 @@
       <button class="secondary" onclick="cancelEpisodeEdit()">取消</button>
     </div>
 
-    <h3 style="margin-top:20px;">篇目列表（點選篇名展開查看話名）</h3>
+    <div class="parts-toolbar" style="margin-top:20px;">
+      <h3 style="margin:0;">篇目列表</h3>
+      <div>
+        <button type="button" class="small secondary" onclick="expandAllParts()">打開全部話</button>
+        <button type="button" class="small secondary" onclick="collapseAllParts()">收起全部話</button>
+      </div>
+    </div>
     <div id="detail-parts-list"></div>
 
     <!-- 公開留言區 -->
@@ -248,6 +272,11 @@
     <h2>建立新作品</h2>
     <input type="text" id="edit-novel-name" placeholder="請輸入新作品名稱">
     <textarea id="edit-novel-desc" rows="2" placeholder="作品簡介"></textarea>
+    <label style="font-size:13px; font-weight:bold;">第一篇類型</label>
+    <select id="edit-part-type">
+      <option value="multi">多話（需打開看話名）</option>
+      <option value="single">單篇（不用打開，直接閱讀）</option>
+    </select>
     <input type="text" id="edit-part-title" placeholder="第一篇篇名（選填，留空則同第一話話名）">
     <input type="text" id="edit-episode-title" placeholder="第一話話名（必填，例如：第一話 命運的開端）">
     <textarea id="edit-episode-content" rows="10" placeholder="請在此輸入小說內文（依你原本換行每 20 行自動分一頁）..."></textarea>
@@ -267,6 +296,12 @@
       <button type="button" class="font-btn" data-mode="medium" onclick="setReaderFontMode('medium')">中</button>
       <button type="button" class="font-btn" data-mode="large" onclick="setReaderFontMode('large')">大</button>
       <button type="button" class="font-btn" data-mode="xlarge" onclick="setReaderFontMode('xlarge')">特大</button>
+    </div>
+
+    <div class="font-toolbar">
+      <span>段落縮行：</span>
+      <button type="button" class="indent-btn active" data-indent="indent2" onclick="setParagraphIndent('indent2')">縮行（空兩格）</button>
+      <button type="button" class="indent-btn" data-indent="none" onclick="setParagraphIndent('none')">不縮行</button>
     </div>
 
     <div class="font-toolbar">
@@ -325,6 +360,7 @@
 
   let currentNovelId = null;
   let editingEpisodeIndex = null;
+  let addingToPartTitle = null;
   let expandedPartKeys = new Set();
 
   let activeNovel = null;
@@ -333,9 +369,24 @@
   let currentPage = 0;
   let isAnimatingPage = false;
   let pageScrollMode = "top";
+  let paragraphIndentMode = "indent2"; // "indent2" | "none"
 
   function nowText() {
     return new Date().toLocaleString("zh-TW", { hour12: false });
+  }
+
+  function setParagraphIndent(mode) {
+    paragraphIndentMode = mode === "none" ? "none" : "indent2";
+    document.querySelectorAll(".indent-btn").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.indent === paragraphIndentMode);
+    });
+    localStorage.setItem("novel_paragraph_indent_mode", paragraphIndentMode);
+    if (activeNovel && activeNovel.chapters[activeEpisodeIdx]) {
+      paginatedPages = paginateText(activeNovel.chapters[activeEpisodeIdx].content);
+      currentPage = Math.min(currentPage, paginatedPages.length - 1);
+      document.getElementById("reader-content").innerText = paginatedPages[currentPage];
+      document.getElementById("page-indicator").innerText = `第 ${currentPage + 1} / ${paginatedPages.length} 頁`;
+    }
   }
 
   function setPageScrollMode(mode) {
@@ -465,27 +516,31 @@
     return (boardNode && Array.isArray(boardNode.posts)) ? boardNode.posts : [];
   }
 
-  // 取得每「話」的篇名（若未填篇名則預設同話名）
   function getEpisodePartTitle(ep) {
     const rawPart = (ep && typeof ep.partTitle === "string") ? ep.partTitle.trim() : "";
     if (rawPart) return rawPart;
     return (ep && ep.title) ? ep.title : "未命名篇";
   }
 
-  // 將作品的 episodes（原 chapters）依連續相同篇名分組為「篇」
   function groupNovelIntoParts(novel) {
     const episodes = Array.isArray(novel.chapters) ? novel.chapters : [];
     const parts = [];
     episodes.forEach((ep, epIdx) => {
       const partName = getEpisodePartTitle(ep);
+      const isSingleMode = ep.partMode === "single";
       const lastPart = parts[parts.length - 1];
       if (lastPart && lastPart.partTitle === partName) {
         lastPart.episodes.push({ ep, epIdx });
+        // 若同篇已超過 1 話，強制視為多話
+        if (lastPart.episodes.length > 1) {
+          lastPart.partMode = "multi";
+        }
       } else {
         parts.push({
           partKey: `${novel.id}__part_${parts.length}_${partName}`,
           partIndex: parts.length,
           partTitle: partName,
+          partMode: isSingleMode ? "single" : "multi",
           episodes: [{ ep, epIdx }]
         });
       }
@@ -536,7 +591,6 @@
     novelsSha = nRes.sha;
   }
 
-  // 更新使用者最後上線時間
   async function touchUserOnlineTime(user) {
     if (!user) return;
     const stamp = nowText();
@@ -563,6 +617,9 @@
 
     const savedScroll = localStorage.getItem("novel_page_scroll_mode") || "top";
     setPageScrollMode(savedScroll);
+
+    const savedIndent = localStorage.getItem("novel_paragraph_indent_mode") || "indent2";
+    setParagraphIndent(savedIndent);
 
     try {
       await loadAllData();
@@ -810,7 +867,6 @@
     }
   }
 
-  // ==================== 公共版功能 ====================
   function renderPublicBoard() {
     const canPost = hasCreatorPermission(currentUser);
     document.getElementById("board-composer").classList.toggle("hidden", !canPost);
@@ -884,7 +940,6 @@
       renderPublicBoard();
     });
   }
-  // ====================================================
 
   function getRatingSummary(novel) {
     const ratings = novel.ratings || {};
@@ -1008,6 +1063,19 @@
     renderNovelPartsUI(getRealNovels().find(n => n.id === currentNovelId));
   }
 
+  function expandAllParts() {
+    const novel = getRealNovels().find(n => n.id === currentNovelId);
+    if (!novel) return;
+    const parts = groupNovelIntoParts(novel);
+    expandedPartKeys = new Set(parts.map(p => p.partKey));
+    renderNovelPartsUI(novel);
+  }
+
+  function collapseAllParts() {
+    expandedPartKeys.clear();
+    renderNovelPartsUI(getRealNovels().find(n => n.id === currentNovelId));
+  }
+
   function renderNovelPartsUI(novel) {
     const partsListEl = document.getElementById("detail-parts-list");
     if (!novel) return;
@@ -1018,22 +1086,46 @@
       return;
     }
 
-    // 預設展開第一篇，方便直接看話名
-    if (expandedPartKeys.size === 0 && parts.length > 0) {
-      expandedPartKeys.add(parts[0].partKey);
-    }
-
     const canManage = canEditNovel(novel);
 
     partsListEl.innerHTML = parts.map((part) => {
+      const isSinglePart = part.partMode === "single" && part.episodes.length === 1;
+
+      // 單篇模式且只有 1 話：不用打開，直接閱讀
+      if (isSinglePart) {
+        const { ep, epIdx } = part.episodes[0];
+        const epProg = currentUser.episodeProgress?.[novel.id]?.[epIdx];
+        const epProgBadge = epProg ? `<span class="badge">已讀至第 ${epProg.page + 1} 頁</span>` : "";
+        const safePartTitle = part.partTitle.replace(/'/g, "\\'");
+
+        return `
+          <div class="part-card">
+            <div class="part-header">
+              <div>
+                <strong>📄 ${part.partTitle}</strong>
+                <span class="badge">單篇</span> ${epProgBadge}
+              </div>
+              <div>
+                <button class="small" onclick="openReader('${novel.id}', ${epIdx}, 0)">直接閱讀</button>
+                ${canManage ? `
+                  <button class="small secondary" onclick="startEditEpisode(${epIdx})">編輯</button>
+                  <button class="small" onclick="startAddEpisodeInPart('${safePartTitle}')">＋ 新增話</button>
+                ` : ""}
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      // 多話模式：可打開／收合查看話名
       const isExpanded = expandedPartKeys.has(part.partKey);
+      const safePartTitle = part.partTitle.replace(/'/g, "\\'");
+
       const epRowsHtml = part.episodes.map(({ ep, epIdx }, idxInPart) => {
         const isFirst = idxInPart === 0;
         const isLast = idxInPart === part.episodes.length - 1;
         const epProg = currentUser.episodeProgress?.[novel.id]?.[epIdx];
-        const epProgBadge = epProg
-          ? `<span class="badge">已讀至第 ${epProg.page + 1} 頁</span>`
-          : "";
+        const epProgBadge = epProg ? `<span class="badge">已讀至第 ${epProg.page + 1} 頁</span>` : "";
 
         return `
           <div class="chapter-row">
@@ -1046,6 +1138,7 @@
                 <button class="small secondary" ${isFirst ? "disabled" : ""} onclick="moveEpisodeOrder('${novel.id}', ${epIdx}, -1, this)">↑ 上移</button>
                 <button class="small secondary" ${isLast ? "disabled" : ""} onclick="moveEpisodeOrder('${novel.id}', ${epIdx}, 1, this)">↓ 下移</button>
                 <button class="small secondary" onclick="startEditEpisode(${epIdx})">編輯</button>
+                <button class="small" onclick="startAddEpisodeInPart('${safePartTitle}')">＋ 新增話</button>
               ` : ""}
             </div>
           </div>
@@ -1059,9 +1152,12 @@
               <strong>📚 ${part.partTitle}</strong>
               <span class="badge">${part.episodes.length} 話</span>
             </div>
-            <button class="small secondary" onclick="togglePartExpand('${part.partKey}')">
-              ${isExpanded ? "收合話名 ▲" : "打開話名 ▼"}
-            </button>
+            <div>
+              ${canManage ? `<button class="small" onclick="startAddEpisodeInPart('${safePartTitle}')">＋ 新增話</button>` : ""}
+              <button class="small secondary" onclick="togglePartExpand('${part.partKey}')">
+                ${isExpanded ? "收起話名 ▲" : "打開話名 ▼"}
+              </button>
+            </div>
           </div>
           <div class="episode-list ${isExpanded ? "" : "hidden"}">
             ${epRowsHtml}
@@ -1071,7 +1167,6 @@
     }).join("");
   }
 
-  // 更改「話」的順序（上移 / 下移）
   async function moveEpisodeOrder(novelId, epIdx, direction, btnEl) {
     await runSingleAction(btnEl, "排序中...", async () => {
       await loadAllData();
@@ -1081,13 +1176,14 @@
       const swapIdx = epIdx + direction;
       if (swapIdx < 0 || swapIdx >= target.chapters.length) return;
 
-      // 確保移動後仍留在同一篇內，若跨篇則帶入目標話的篇名
       const movingEp = target.chapters[epIdx];
       const neighborEp = target.chapters[swapIdx];
       const neighborPart = getEpisodePartTitle(neighborEp);
       if (getEpisodePartTitle(movingEp) !== neighborPart) {
         movingEp.partTitle = neighborPart;
       }
+      movingEp.partMode = "multi";
+      neighborEp.partMode = "multi";
 
       const temp = target.chapters[epIdx];
       target.chapters[epIdx] = target.chapters[swapIdx];
@@ -1104,8 +1200,10 @@
     if (!novel) return;
     currentNovelId = novelId;
     editingEpisodeIndex = null;
+    addingToPartTitle = null;
 
     document.getElementById("edit-novel-panel").classList.add("hidden");
+    document.getElementById("add-part-panel").classList.add("hidden");
     document.getElementById("add-episode-panel").classList.add("hidden");
     document.getElementById("edit-episode-panel").classList.add("hidden");
 
@@ -1228,6 +1326,7 @@
     const novel = getRealNovels().find(n => n.id === currentNovelId);
     if (!canEditNovel(novel)) return alert("只有作品作者或站長可以編輯！");
     const panel = document.getElementById("edit-novel-panel");
+    document.getElementById("add-part-panel").classList.add("hidden");
     document.getElementById("add-episode-panel").classList.add("hidden");
     document.getElementById("edit-episode-panel").classList.add("hidden");
     document.getElementById("edit-novel-title-input").value = novel.title;
@@ -1258,66 +1357,114 @@
     });
   }
 
-  function onSelectPartChange() {
-    const sel = document.getElementById("select-existing-part");
-    const partInput = document.getElementById("new-part-title");
-    if (sel.value === "__NEW__") {
-      partInput.disabled = false;
-      partInput.value = "";
-      partInput.placeholder = "新篇名（選填，留空則同話名）";
-    } else {
-      partInput.disabled = true;
-      partInput.value = sel.value;
-    }
-  }
-
-  function toggleAddEpisodePanel() {
+  // 上方「新增篇」
+  function toggleAddPartPanel() {
     const novel = getRealNovels().find(n => n.id === currentNovelId);
-    if (!canEditNovel(novel)) return alert("只有作品作者或站長可以新增篇/話！");
-    const panel = document.getElementById("add-episode-panel");
+    if (!canEditNovel(novel)) return alert("只有作品作者或站長可以新增篇！");
+    const panel = document.getElementById("add-part-panel");
     document.getElementById("edit-novel-panel").classList.add("hidden");
+    document.getElementById("add-episode-panel").classList.add("hidden");
     document.getElementById("edit-episode-panel").classList.add("hidden");
-
-    const sel = document.getElementById("select-existing-part");
-    const uniqueParts = [...new Set((novel.chapters || []).map(ep => getEpisodePartTitle(ep)))];
-    sel.innerHTML = `<option value="__NEW__">＋ 建立新篇（可自訂篇名）</option>` +
-      uniqueParts.map(p => `<option value="${p.replace(/"/g, "&quot;")}">加入現有篇：${p}</option>`).join("");
-    sel.value = "__NEW__";
-    onSelectPartChange();
-
     panel.classList.toggle("hidden");
   }
 
-  async function addEpisodeToNovel(btnEl) {
-    await runSingleAction(btnEl, "發布中...", async () => {
+  async function addPartToNovel(btnEl) {
+    await runSingleAction(btnEl, "建立中...", async () => {
       const novel = getRealNovels().find(n => n.id === currentNovelId);
       if (!canEditNovel(novel)) return;
 
-      const selVal = document.getElementById("select-existing-part").value;
+      const partType = document.getElementById("new-part-type").value;
       const rawPart = document.getElementById("new-part-title").value.trim();
-      const epTitle = document.getElementById("new-episode-title").value.trim();
-      const epContent = document.getElementById("new-episode-content").value;
+      const epTitle = document.getElementById("new-part-first-episode").value.trim();
+      const epContent = document.getElementById("new-part-content").value;
 
-      if (!epTitle || !epContent) return alert("話名與內文不能為空！");
-      const finalPartTitle = selVal !== "__NEW__" ? selVal : (rawPart || epTitle);
+      if (!epTitle || !epContent) return alert("第一話話名與內文不能為空！");
+      const finalPartTitle = rawPart || epTitle;
 
       await loadAllData();
       const target = getRealNovels().find(n => n.id === currentNovelId);
       if (target) {
         target.chapters.push({
           partTitle: finalPartTitle,
+          partMode: partType === "single" ? "single" : "multi",
           title: epTitle,
           content: epContent
         });
-        novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Add episode ${epTitle}`);
+        novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Add part ${finalPartTitle}`);
       }
 
       document.getElementById("new-part-title").value = "";
-      document.getElementById("new-episode-title").value = "";
-      document.getElementById("new-episode-content").value = "";
-      alert("新內容已發布！");
+      document.getElementById("new-part-first-episode").value = "";
+      document.getElementById("new-part-content").value = "";
+      document.getElementById("add-part-panel").classList.add("hidden");
+      alert("新篇已建立！");
       renderNovelList();
       openNovelDetail(currentNovelId);
+    });
+  }
+
+  // 打開後「新增話」
+  function startAddEpisodeInPart(partTitle) {
+    const novel = getRealNovels().find(n => n.id === currentNovelId);
+    if (!canEditNovel(novel)) return alert("只有作品作者或站長可以新增話！");
+    addingToPartTitle = partTitle;
+
+    document.getElementById("edit-novel-panel").classList.add("hidden");
+    document.getElementById("add-part-panel").classList.add("hidden");
+    document.getElementById("edit-episode-panel").classList.add("hidden");
+
+    const panel = document.getElementById("add-episode-panel");
+    document.getElementById("adding-episode-part-label").innerText = partTitle;
+    document.getElementById("new-episode-title").value = "";
+    document.getElementById("new-episode-content").value = "";
+    panel.classList.remove("hidden");
+    panel.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function cancelAddEpisode() {
+    addingToPartTitle = null;
+    document.getElementById("add-episode-panel").classList.add("hidden");
+  }
+
+  async function addEpisodeToCurrentPart(btnEl) {
+    await runSingleAction(btnEl, "發布中...", async () => {
+      const novel = getRealNovels().find(n => n.id === currentNovelId);
+      if (!canEditNovel(novel) || !addingToPartTitle) return;
+
+      const epTitle = document.getElementById("new-episode-title").value.trim();
+      const epContent = document.getElementById("new-episode-content").value;
+      if (!epTitle || !epContent) return alert("話名與內文不能為空！");
+
+      await loadAllData();
+      const target = getRealNovels().find(n => n.id === currentNovelId);
+      if (target) {
+        // 該篇新增話後，同篇一律轉為多話模式
+        target.chapters.forEach(ep => {
+          if (getEpisodePartTitle(ep) === addingToPartTitle) {
+            ep.partMode = "multi";
+          }
+        });
+        target.chapters.push({
+          partTitle: addingToPartTitle,
+          partMode: "multi",
+          title: epTitle,
+          content: epContent
+        });
+        novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Add episode ${epTitle} in ${addingToPartTitle}`);
+      }
+
+      const targetPart = addingToPartTitle;
+      addingToPartTitle = null;
+      document.getElementById("add-episode-panel").classList.add("hidden");
+      alert("新話已發布！");
+      renderNovelList();
+      openNovelDetail(currentNovelId);
+      const parts = groupNovelIntoParts(getRealNovels().find(n => n.id === currentNovelId));
+      const matched = parts.find(p => p.partTitle === targetPart);
+      if (matched) {
+        expandedPartKeys.add(matched.partKey);
+        renderNovelPartsUI(getRealNovels().find(n => n.id === currentNovelId));
+      }
     });
   }
 
@@ -1327,10 +1474,26 @@
     editingEpisodeIndex = idx;
 
     document.getElementById("edit-novel-panel").classList.add("hidden");
+    document.getElementById("add-part-panel").classList.add("hidden");
     document.getElementById("add-episode-panel").classList.add("hidden");
     document.getElementById("edit-episode-panel").classList.remove("hidden");
 
     const ep = novel.chapters[idx];
+    const partName = getEpisodePartTitle(ep);
+    const samePartCount = novel.chapters.filter(item => getEpisodePartTitle(item) === partName).length;
+    const modeSelect = document.getElementById("edit-part-mode-select");
+    const modeHint = document.getElementById("edit-part-mode-hint");
+
+    modeSelect.value = ep.partMode === "single" ? "single" : "multi";
+    if (samePartCount >= 2) {
+      modeSelect.value = "multi";
+      modeSelect.disabled = true;
+      modeHint.innerText = `⚠️ 此篇目前已有 ${samePartCount} 話，無法改回「單篇」。`;
+    } else {
+      modeSelect.disabled = false;
+      modeHint.innerText = "";
+    }
+
     document.getElementById("editing-episode-label").innerText = `第 ${idx + 1} 話`;
     document.getElementById("edit-part-title-input").value = ep.partTitle || "";
     document.getElementById("edit-episode-title-input").value = ep.title;
@@ -1348,6 +1511,7 @@
       if (!canEditNovel(novel) || editingEpisodeIndex === null) return;
 
       const newPart = document.getElementById("edit-part-title-input").value.trim();
+      const selectedMode = document.getElementById("edit-part-mode-select").value;
       const newTitle = document.getElementById("edit-episode-title-input").value.trim();
       const newContent = document.getElementById("edit-episode-content-input").value;
       if (!newTitle || !newContent) return alert("話名與內文不能為空！");
@@ -1355,7 +1519,14 @@
       await loadAllData();
       const target = getRealNovels().find(n => n.id === currentNovelId);
       if (target && target.chapters[editingEpisodeIndex]) {
-        target.chapters[editingEpisodeIndex].partTitle = newPart || newTitle;
+        const finalPart = newPart || newTitle;
+        const countInPart = target.chapters.filter((ch, i) => i !== editingEpisodeIndex && getEpisodePartTitle(ch) === finalPart).length;
+        if (selectedMode === "single" && countInPart >= 1) {
+          return alert("此篇已有 2 話以上，不能改成單篇！");
+        }
+
+        target.chapters[editingEpisodeIndex].partTitle = finalPart;
+        target.chapters[editingEpisodeIndex].partMode = selectedMode === "single" ? "single" : "multi";
         target.chapters[editingEpisodeIndex].title = newTitle;
         target.chapters[editingEpisodeIndex].content = newContent;
         novelsSha = await saveGitHubFile("novels.json", novelsData, novelsSha, `Edit episode ${newTitle}`);
@@ -1369,11 +1540,19 @@
   }
 
   function paginateText(text) {
-    const lines = text.split("\n");
+    const rawLines = text.split("\n");
+    const formattedLines = rawLines.map(line => {
+      if (paragraphIndentMode === "indent2") {
+        const trimmed = line.replace(/^[ \s]+/, "");
+        return trimmed ? `  ${trimmed}` : "";
+      }
+      return line.replace(/^ {2}/, "");
+    });
+
     const linesPerPage = 20;
     const pages = [];
-    for (let i = 0; i < lines.length; i += linesPerPage) {
-      pages.push(lines.slice(i, i + linesPerPage).join("\n"));
+    for (let i = 0; i < formattedLines.length; i += linesPerPage) {
+      pages.push(formattedLines.slice(i, i + linesPerPage).join("\n"));
     }
     return pages.length > 0 ? pages : ["（本話尚無內容）"];
   }
@@ -1401,6 +1580,9 @@
     currentNovelId = novelId;
     activeEpisodeIdx = episodeIdx;
     const episode = activeNovel.chapters[episodeIdx];
+
+    const savedIndent = localStorage.getItem("novel_paragraph_indent_mode") || "indent2";
+    setParagraphIndent(savedIndent);
 
     paginatedPages = paginateText(episode.content);
     currentPage = Math.min(Math.max(startPage, 0), paginatedPages.length - 1);
@@ -1517,6 +1699,7 @@
     await runSingleAction(btnEl, "建立中...", async () => {
       const novelName = document.getElementById("edit-novel-name").value.trim();
       const novelDesc = document.getElementById("edit-novel-desc").value.trim();
+      const partType = document.getElementById("edit-part-type").value;
       const partTitleInput = document.getElementById("edit-part-title").value.trim();
       const epTitle = document.getElementById("edit-episode-title").value.trim();
       const epContent = document.getElementById("edit-episode-content").value;
@@ -1540,6 +1723,7 @@
         deleteRequested: false,
         chapters: [{
           partTitle: finalPartTitle,
+          partMode: partType === "single" ? "single" : "multi",
           title: epTitle,
           content: epContent
         }]
@@ -1557,7 +1741,6 @@
     });
   }
 
-  // 管理員面板：顯示每位會員最後上線時間與每篇/每話進度
   function formatUserProgressSummary(user) {
     const realNovels = getRealNovels();
     const epProgMap = user.episodeProgress || {};
