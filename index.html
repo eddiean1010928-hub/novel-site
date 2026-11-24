@@ -34,11 +34,11 @@
     .comment-meta { font-size: 12px; color: #666; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
     .board-post { border: 1px solid var(--border); background: #fcfcfd; border-radius: 10px; padding: 14px; margin-bottom: 12px; }
 
-    /* 字體大小控制列 */
+    /* 字體大小與翻頁位置控制列 */
     .font-toolbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; background: #f2f2f7; padding: 8px 12px; border-radius: 8px; }
     .font-toolbar span { font-size: 13px; color: #555; margin-right: 4px; }
-    .font-btn { width: auto; padding: 4px 10px; margin: 0; font-size: 13px; background: #ffffff; color: var(--text); border: 1px solid var(--border); font-weight: normal; }
-    .font-btn.active { background: var(--primary); color: #ffffff; border-color: var(--primary); font-weight: bold; }
+    .font-btn, .scroll-mode-btn { width: auto; padding: 4px 10px; margin: 0; font-size: 13px; background: #ffffff; color: var(--text); border: 1px solid var(--border); font-weight: normal; }
+    .font-btn.active, .scroll-mode-btn.active { background: var(--primary); color: #ffffff; border-color: var(--primary); font-weight: bold; }
     .layout-tag { font-size: 12px; color: #0066cc; background: #e8f2ff; padding: 4px 10px; border-radius: 6px; display: inline-block; margin-bottom: 10px; }
 
     /* 閱讀器容器與翻頁動畫 */
@@ -133,12 +133,11 @@
     <div id="novel-list">載入中...</div>
   </div>
 
-  <!-- 2.5 公共版區塊（僅創作者可發文，所有人皆可看） -->
+  <!-- 2.5 公共版區塊 -->
   <div id="public-board-section" class="hidden">
     <h2>📢 創作者公共版</h2>
     <p style="font-size:14px; color:#666;">由創作者發布的創作動態、更新預告與交流公告（所有會員皆可瀏覽）。</p>
 
-    <!-- 只有創作者或站長才顯示發文表單 -->
     <div id="board-composer" class="panel hidden" style="margin-bottom:16px;">
       <strong>✍️ 發布公共版貼文（創作者專屬）</strong>
       <input type="text" id="board-post-title" placeholder="貼文標題（例如：新篇章預告 / 創作雜談）">
@@ -162,7 +161,6 @@
     <p id="detail-views" style="font-size:14px; color:#555; margin:4px 0;"></p>
     <p id="detail-rating-summary" style="font-size:14px; font-weight:bold; margin:6px 0;"></p>
 
-    <!-- 作品評分（滿分 5 顆星） -->
     <div class="rating-box">
       <span style="font-size:14px;">你的評分（滿分 5 ⭐）：</span>
       <button type="button" class="star-btn" data-star="1" onclick="rateNovel(1, this)">★</button>
@@ -187,7 +185,6 @@
       <button id="btn-apply-delete-novel" class="danger small" onclick="requestDeleteNovel(this)">申請刪除作品</button>
     </div>
 
-    <!-- 編輯作品標題與簡介面板 -->
     <div id="edit-novel-panel" class="panel hidden">
       <h3>編輯作品標題與簡介</h3>
       <label style="font-size:14px; font-weight:bold;">作品標題</label>
@@ -198,7 +195,6 @@
       <button class="secondary" onclick="document.getElementById('edit-novel-panel').classList.add('hidden')">取消</button>
     </div>
 
-    <!-- 新增篇章面板 -->
     <div id="add-chapter-panel" class="panel hidden">
       <h3>新增篇章</h3>
       <input type="text" id="new-chapter-title" placeholder="篇章標題（例如：第一章 命運的開端）">
@@ -207,7 +203,6 @@
       <button class="secondary" onclick="document.getElementById('add-chapter-panel').classList.add('hidden')">取消</button>
     </div>
 
-    <!-- 編輯指定章節面板 -->
     <div id="edit-chapter-panel" class="panel hidden">
       <h3>編輯篇章：<span id="editing-chapter-label"></span></h3>
       <input type="text" id="edit-chapter-title-input" placeholder="篇章標題">
@@ -219,7 +214,6 @@
     <h3 style="margin-top:20px;">篇章列表</h3>
     <div id="detail-chapter-list"></div>
 
-    <!-- 公開留言區 -->
     <div class="panel" style="margin-top:22px;">
       <h3>💬 作品留言區（大家皆可見）</h3>
       <textarea id="comment-input" rows="2" placeholder="寫下你對這部作品的想法或留言..."></textarea>
@@ -254,13 +248,20 @@
       <button type="button" class="font-btn" data-mode="xlarge" onclick="setReaderFontMode('xlarge')">特大</button>
     </div>
 
+    <!-- 翻頁後捲動位置選擇 -->
+    <div class="font-toolbar">
+      <span>翻頁後位置：</span>
+      <button type="button" class="scroll-mode-btn active" data-scroll="top" onclick="setPageScrollMode('top')">到最上方</button>
+      <button type="button" class="scroll-mode-btn" data-scroll="bottom" onclick="setPageScrollMode('bottom')">到最下方</button>
+    </div>
+
     <div id="layout-notice" class="layout-tag">📌 依原作編排顯示（特小字 · 每行約 25 字）</div>
 
     <div class="reader-viewport">
       <div id="reader-content" class="reader-box mode-xsmall25"></div>
     </div>
 
-    <div class="pagination">
+    <div id="reader-bottom-anchor" class="pagination">
       <button id="btn-prev-page" onclick="changePage(-1)">上一頁</button>
       <span id="page-indicator">第 1 / 1 頁</span>
       <button id="btn-next-page" onclick="changePage(1)">下一頁</button>
@@ -310,6 +311,28 @@
   let paginatedPages = [];
   let currentPage = 0;
   let isAnimatingPage = false;
+  let pageScrollMode = "top"; // "top" | "bottom"
+
+  function setPageScrollMode(mode) {
+    pageScrollMode = mode === "bottom" ? "bottom" : "top";
+    document.querySelectorAll(".scroll-mode-btn").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.scroll === pageScrollMode);
+    });
+    localStorage.setItem("novel_page_scroll_mode", pageScrollMode);
+  }
+
+  function applyPageScrollPosition() {
+    if (pageScrollMode === "bottom") {
+      const anchor = document.getElementById("reader-bottom-anchor");
+      if (anchor) {
+        anchor.scrollIntoView({ behavior: "smooth", block: "end" });
+      } else {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+      }
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }
 
   async function runSingleAction(btnEl, busyText, taskFn) {
     if (isSaving) return;
@@ -406,13 +429,11 @@
     return Boolean(currentUser.canCreate) && novel.author === currentUser.username;
   }
 
-  // 取得真正的小說清單（排除公共版系統節點）
   function getRealNovels() {
     if (!Array.isArray(novelsData)) return [];
     return novelsData.filter(n => n.id !== CONFIG.BOARD_ID);
   }
 
-  // 取得公共版貼文陣列
   function getBoardPosts() {
     if (!Array.isArray(novelsData)) return [];
     const boardNode = novelsData.find(n => n.id === CONFIG.BOARD_ID);
@@ -465,6 +486,9 @@
   window.onload = async () => {
     const savedMode = localStorage.getItem("novel_reader_font_mode") || "xsmall25";
     setReaderFontMode(savedMode);
+
+    const savedScroll = localStorage.getItem("novel_page_scroll_mode") || "top";
+    setPageScrollMode(savedScroll);
 
     try {
       await loadAllData();
@@ -701,7 +725,6 @@
     }
   }
 
-  // ==================== 公共版功能 ====================
   function renderPublicBoard() {
     const canPost = hasCreatorPermission(currentUser);
     document.getElementById("board-composer").classList.toggle("hidden", !canPost);
@@ -775,7 +798,6 @@
       renderPublicBoard();
     });
   }
-  // ====================================================
 
   function getRatingSummary(novel) {
     const ratings = novel.ratings || {};
@@ -1145,7 +1167,6 @@
     return pages.length > 0 ? pages : ["（本章節尚無內容）"];
   }
 
-  // 增加該作品閱讀次數（寫入 novels.json）
   async function incrementNovelViews(novelId) {
     const target = getRealNovels().find(n => n.id === novelId);
     if (!target) return;
@@ -1178,6 +1199,9 @@
 
     const savedMode = localStorage.getItem("novel_reader_font_mode") || "xsmall25";
     setReaderFontMode(savedMode);
+
+    const savedScroll = localStorage.getItem("novel_page_scroll_mode") || "top";
+    setPageScrollMode(savedScroll);
 
     showSection("reader-section");
     await incrementNovelViews(novelId);
@@ -1220,7 +1244,7 @@
       box.classList.add(direction > 0 ? "prep-in-right" : "prep-in-left");
 
       updateReaderView();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      applyPageScrollPosition();
 
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
