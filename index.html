@@ -157,6 +157,7 @@
     .pagination button { width: 30%; }
     .badge { background: #e8f2ff; color: var(--primary); padding: 2px 8px; border-radius: 12px; font-size: 12px; white-space: nowrap; }
     .badge.warn { background: #fff3cd; color: #856404; }
+    .badge.online { background: #e6f7ed; color: #1e7e34; font-weight: bold; }
     .notice { background: #f2f6fc; border-left: 4px solid var(--primary); padding: 10px 14px; border-radius: 6px; font-size: 14px; margin-bottom: 12px; }
     .panel { background: #fafafa; border: 1px solid var(--border); padding: 15px; border-radius: 10px; margin-top: 14px; }
     .progress-detail-box { background: #f4f6f9; border-radius: 8px; padding: 8px 12px; margin-top: 8px; font-size: 13px; color: #333; }
@@ -448,6 +449,10 @@
   let currentUser = null;
 
   let isSaving = false;
+  let isTouchingOnline = false;
+  let lastOnlineTouchMs = 0;
+  const ONLINE_TOUCH_INTERVAL_MS = 60 * 1000;
+  const ONLINE_ACTIVE_WINDOW_MS = 5 * 60 * 1000;
 
   let currentNovelId = null;
   let editingPartOriginalTitle = null;
@@ -465,6 +470,21 @@
 
   function nowText() {
     return new Date().toLocaleString("zh-TW", { hour12: false });
+  }
+
+  function parseLastOnlineTimestamp(lastOnlineStr) {
+    if (!lastOnlineStr || typeof lastOnlineStr !== "string") return NaN;
+    const direct = Date.parse(lastOnlineStr);
+    if (!Number.isNaN(direct)) return direct;
+    const normalized = lastOnlineStr.replace(/\//g, "-").replace(/上午|下午/g, m => (m === "上午" ? "AM" : "PM"));
+    const parsed = Date.parse(normalized);
+    return Number.isNaN(parsed) ? NaN : parsed;
+  }
+
+  function isUserOnlineRecently(lastOnlineStr) {
+    const ts = parseLastOnlineTimestamp(lastOnlineStr);
+    if (Number.isNaN(ts)) return false;
+    return (Date.now() - ts) <= ONLINE_ACTIVE_WINDOW_MS;
   }
 
   function setParagraphIndent(mode) {
@@ -703,23 +723,37 @@
     novelsSha = nRes.sha;
   }
 
-  async function touchUserOnlineTime(user) {
-    if (!user) return;
-    const stamp = nowText();
-    user.lastOnline = stamp;
-    const uIdx = usersData.findIndex(u => u.username === user.username);
-    if (uIdx !== -1) {
-      usersData[uIdx].lastOnline = stamp;
-      if (!isSaving) {
-        isSaving = true;
-        try {
-          usersSha = await saveGitHubFile("password.json", usersData, usersSha, `Update online time for ${user.username}`);
-        } catch (e) {
-          console.error("更新上線時間失敗：", e);
-        } finally {
-          isSaving = false;
-        }
+  async function touchUserOnlineTime(user, options = {}) {
+    if (!user || !user.username) return;
+    const force = Boolean(options.force);
+    const nowMs = Date.now();
+    if (!force && (nowMs - lastOnlineTouchMs) < ONLINE_TOUCH_INTERVAL_MS) {
+      return;
+    }
+    if (isTouchingOnline) return;
+    isTouchingOnline = true;
+    lastOnlineTouchMs = nowMs;
+
+    try {
+      const latest = await fetchGitHubFile("password.json");
+      const list = Array.isArray(latest.json) ? latest.json : [];
+      const stamp = nowText();
+      const uIdx = list.findIndex(u => u.username === user.username);
+      if (uIdx !== -1) {
+        list[uIdx].lastOnline = stamp;
+        user.lastOnline = stamp;
+        usersSha = await saveGitHubFile(
+          "password.json",
+          list,
+          latest.sha,
+          `Update online time for ${user.username}`
+        );
+        usersData = list;
       }
+    } catch (e) {
+      console.error("更新上線時間失敗：", e);
+    } finally {
+      isTouchingOnline = false;
     }
   }
 
@@ -738,7 +772,7 @@
       const savedUser = localStorage.getItem("novel_logged_user");
       if (savedUser && Array.isArray(usersData)) {
         const found = usersData.find(u => u.username === savedUser);
-        if (found) await enterSystem(found);
+        if (found) await enterSystem(found, { forceOnlineTouch: true });
       }
     } catch (e) {
       alert("讀取資料庫失敗：\n" + e.message);
@@ -825,8 +859,9 @@
           ownerUser.lastOnline = nowText();
         }
         usersSha = await saveGitHubFile("password.json", usersData, usersSha, `Login owner ${CONFIG.OWNER_USER}`);
+        lastOnlineTouchMs = Date.now();
         localStorage.setItem("novel_logged_user", ownerUser.username);
-        await enterSystem(ownerUser);
+        await enterSystem(ownerUser, { forceOnlineTouch: false });
         return;
       }
 
@@ -837,8 +872,9 @@
 
       user.lastOnline = nowText();
       usersSha = await saveGitHubFile("password.json", usersData, usersSha, `Login user ${username}`);
+      lastOnlineTouchMs = Date.now();
       localStorage.setItem("novel_logged_user", user.username);
-      await enterSystem(user);
+      await enterSystem(user, { forceOnlineTouch: false });
     });
   }
 
@@ -859,7 +895,7 @@
     badge.classList.remove("hidden");
   }
 
-  async function enterSystem(user) {
+  async function enterSystem(user, options = {}) {
     currentUser = user;
     currentUser.progress = currentUser.progress || {};
     currentUser.episodeProgress = currentUser.episodeProgress || {};
@@ -888,7 +924,7 @@
       renderAdminPanel();
     }
     showSection("home-section");
-    await touchUserOnlineTime(currentUser);
+    await touchUserOnlineTime(currentUser, { force: Boolean(options.forceOnlineTouch) });
   }
 
   async function savePenname(btnEl) {
@@ -971,6 +1007,10 @@
       document.getElementById(sec).classList.add("hidden");
     });
     document.getElementById(id).classList.remove("hidden");
+
+    if (currentUser && id !== "auth-section") {
+      touchUserOnlineTime(currentUser, { force: false });
+    }
 
     if (id === "public-board-section") {
       renderPublicBoard();
@@ -1931,6 +1971,7 @@
       try {
         usersData[uIdx] = currentUser;
         usersSha = await saveGitHubFile("password.json", usersData, usersSha, `Update progress for ${currentUser.username}`);
+        lastOnlineTouchMs = Date.now();
       } catch (e) {
         console.error("進度儲存失敗：", e);
       } finally {
@@ -2121,9 +2162,12 @@
       const role = isOwnerAccount(u.username) ? "站長" : (u.canCreate ? "創作者" : "讀者");
       const penInfo = u.penName ? `｜筆名：${u.penName}` : "";
       const onlineText = u.lastOnline || "尚無上線紀錄";
+      const onlineBadge = isUserOnlineRecently(u.lastOnline)
+        ? `<span class="badge online">🟢 線上</span>`
+        : "";
       return `
         <div class="novel-card" style="padding:12px 14px; margin-bottom:10px;">
-          <div><strong>帳號：${u.username}</strong>｜暱稱：${getUserNickname(u)} ${penInfo}</div>
+          <div><strong>帳號：${u.username}</strong>｜暱稱：${getUserNickname(u)} ${penInfo} ${onlineBadge}</div>
           <div style="font-size:13px; color:#666;">身分：${role}｜信箱：${u.email || "無"}</div>
           <div style="font-size:13px; color:#0066cc; font-weight:bold; margin-top:4px;">🕒 最後上線時間：${onlineText}</div>
           ${formatUserProgressSummary(u)}
