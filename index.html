@@ -21,7 +21,17 @@
     .nav { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
     .nav button { width: auto; padding: 6px 12px; margin: 0; font-size: 14px; }
     .novel-card { border: 1px solid var(--border); padding: 15px; border-radius: 8px; margin-bottom: 12px; }
+    .novel-card.last-read-card { border: 2px solid var(--primary); background: #f4f9ff; }
     .novel-card h3 { margin-bottom: 5px; }
+
+    /* 主頁搜尋與分類工具列 */
+    .home-filter-box { background: #f8f9fa; border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 14px; }
+    .search-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .search-row input { flex: 1; min-width: 180px; margin: 0; }
+    .search-row button { width: auto; margin: 0; padding: 10px 14px; font-size: 14px; white-space: nowrap; }
+    .category-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+    .cat-btn { width: auto; padding: 5px 11px; margin: 0; font-size: 13px; background: #ffffff; color: var(--text); border: 1px solid var(--border); font-weight: normal; }
+    .cat-btn.active { background: var(--primary); color: #ffffff; border-color: var(--primary); font-weight: bold; }
 
     /* 篇與話階層樣式 */
     .parts-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
@@ -155,9 +165,26 @@
 
     .pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; }
     .pagination button { width: 30%; }
+    .jump-page-bar {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+      background: #f8f9fa;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #e5e5ea;
+    }
+    .jump-page-bar span { font-size: 13px; color: #555; }
+    .jump-page-bar select { width: auto; min-width: 110px; padding: 6px 10px; margin: 0; font-size: 14px; }
+    .jump-page-bar button { width: auto; padding: 6px 14px; margin: 0; font-size: 14px; }
+
     .badge { background: #e8f2ff; color: var(--primary); padding: 2px 8px; border-radius: 12px; font-size: 12px; white-space: nowrap; }
     .badge.warn { background: #fff3cd; color: #856404; }
     .badge.online { background: #e6f7ed; color: #1e7e34; font-weight: bold; }
+    .badge.top-read { background: #0066cc; color: #ffffff; font-weight: bold; }
     .notice { background: #f2f6fc; border-left: 4px solid var(--primary); padding: 10px 14px; border-radius: 6px; font-size: 14px; margin-bottom: 12px; }
     .panel { background: #fafafa; border: 1px solid var(--border); padding: 15px; border-radius: 10px; margin-top: 14px; }
     .progress-detail-box { background: #f4f6f9; border-radius: 8px; padding: 8px 12px; margin-top: 8px; font-size: 13px; color: #333; }
@@ -218,6 +245,23 @@
     </div>
 
     <h2>所有作品</h2>
+
+    <div class="home-filter-box">
+      <div class="search-row">
+        <input type="text" id="novel-search-input" placeholder="🔍 搜尋書名、作者或簡介..." oninput="applyNovelFilter()">
+        <button type="button" onclick="applyNovelFilter()">搜尋</button>
+        <button type="button" class="secondary" onclick="resetNovelFilter()">重設</button>
+      </div>
+      <div class="category-row" id="novel-category-row">
+        <span style="font-size:13px; color:#555;">分類：</span>
+        <button type="button" class="cat-btn active" data-cat="all" onclick="setNovelCategory('all')">全部</button>
+        <button type="button" class="cat-btn" data-cat="single" onclick="setNovelCategory('single')">單篇作品</button>
+        <button type="button" class="cat-btn" data-cat="multi" onclick="setNovelCategory('multi')">多話連載</button>
+        <button type="button" class="cat-btn" data-cat="popular" onclick="setNovelCategory('popular')">熱門閱讀</button>
+        <button type="button" class="cat-btn" data-cat="topRated" onclick="setNovelCategory('topRated')">高分評價</button>
+      </div>
+    </div>
+
     <div id="novel-list">載入中...</div>
   </div>
 
@@ -413,6 +457,12 @@
       <span id="page-indicator">第 1 / 1 頁</span>
       <button id="btn-next-page" onclick="changePage(1)">下一頁</button>
     </div>
+
+    <div class="jump-page-bar">
+      <span>直接跳至：</span>
+      <select id="jump-page-select" aria-label="選擇頁數"></select>
+      <button type="button" onclick="jumpToSelectedPage()">前往</button>
+    </div>
   </div>
 
   <!-- 6. 管理員面板 -->
@@ -460,6 +510,9 @@
   let addingToPartTitle = null;
   let expandedPartKeys = new Set();
 
+  let currentNovelCategory = "all";
+  let currentNovelSearchQuery = "";
+
   let activeNovel = null;
   let activeEpisodeIdx = 0;
   let paginatedPages = [];
@@ -472,17 +525,17 @@
     return new Date().toLocaleString("zh-TW", { hour12: false });
   }
 
-  function parseLastOnlineTimestamp(lastOnlineStr) {
-    if (!lastOnlineStr || typeof lastOnlineStr !== "string") return NaN;
-    const direct = Date.parse(lastOnlineStr);
+  function parseTimestamp(dateStr) {
+    if (!dateStr || typeof dateStr !== "string") return NaN;
+    const direct = Date.parse(dateStr);
     if (!Number.isNaN(direct)) return direct;
-    const normalized = lastOnlineStr.replace(/\//g, "-").replace(/上午|下午/g, m => (m === "上午" ? "AM" : "PM"));
+    const normalized = dateStr.replace(/\//g, "-").replace(/上午|下午/g, m => (m === "上午" ? "AM" : "PM"));
     const parsed = Date.parse(normalized);
     return Number.isNaN(parsed) ? NaN : parsed;
   }
 
   function isUserOnlineRecently(lastOnlineStr) {
-    const ts = parseLastOnlineTimestamp(lastOnlineStr);
+    const ts = parseTimestamp(lastOnlineStr);
     if (Number.isNaN(ts)) return false;
     return (Date.now() - ts) <= ONLINE_ACTIVE_WINDOW_MS;
   }
@@ -497,7 +550,7 @@
       paginatedPages = paginateText(activeNovel.chapters[activeEpisodeIdx].content);
       currentPage = Math.min(currentPage, paginatedPages.length - 1);
       document.getElementById("reader-content").innerText = paginatedPages[currentPage];
-      document.getElementById("page-indicator").innerText = `第 ${currentPage + 1} / ${paginatedPages.length} 頁`;
+      syncPageIndicatorAndJumpSelect();
     }
   }
 
@@ -520,6 +573,34 @@
     } else {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
+  }
+
+  function syncPageIndicatorAndJumpSelect() {
+    const total = Math.max(paginatedPages.length, 1);
+    const cur = Math.min(Math.max(currentPage, 0), total - 1);
+    document.getElementById("page-indicator").innerText = `第 ${cur + 1} / ${total} 頁`;
+
+    const selectEl = document.getElementById("jump-page-select");
+    if (!selectEl) return;
+    if (selectEl.options.length !== total) {
+      let html = "";
+      for (let i = 0; i < total; i++) {
+        html += `<option value="${i}">第 ${i + 1} 頁</option>`;
+      }
+      selectEl.innerHTML = html;
+    }
+    selectEl.value = String(cur);
+  }
+
+  function jumpToSelectedPage() {
+    if (isAnimatingPage) return;
+    const selectEl = document.getElementById("jump-page-select");
+    if (!selectEl) return;
+    const targetIdx = Number(selectEl.value);
+    if (Number.isNaN(targetIdx) || targetIdx < 0 || targetIdx >= paginatedPages.length) return;
+    if (targetIdx === currentPage) return;
+    const dir = targetIdx > currentPage ? 1 : -1;
+    animateAndTurnPage(targetIdx, dir);
   }
 
   async function runSingleAction(btnEl, busyText, taskFn) {
@@ -1012,7 +1093,9 @@
       touchUserOnlineTime(currentUser, { force: false });
     }
 
-    if (id === "public-board-section") {
+    if (id === "home-section") {
+      renderNovelList();
+    } else if (id === "public-board-section") {
       renderPublicBoard();
     } else if (id === "admin-section" && isOwnerAccount(currentUser?.username)) {
       renderAdminPanel();
@@ -1104,6 +1187,57 @@
     return { avg: Number(avg), count: values.length, text: `⭐ ${avg} / 5.0（共 ${values.length} 人評分）` };
   }
 
+  function getLastReadNovelId() {
+    const progMap = currentUser?.progress || {};
+    const realNovels = getRealNovels();
+    let bestId = null;
+    let bestTime = -1;
+
+    realNovels.forEach((novel, idx) => {
+      const p = progMap[novel.id];
+      if (!p) return;
+      const parsed = parseTimestamp(p.updatedAt);
+      const score = Number.isNaN(parsed) ? idx : parsed;
+      if (score >= bestTime) {
+        bestTime = score;
+        bestId = novel.id;
+      }
+    });
+
+    return bestId;
+  }
+
+  function setNovelCategory(cat) {
+    currentNovelCategory = cat;
+    document.querySelectorAll(".cat-btn").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.cat === cat);
+    });
+    renderNovelList();
+  }
+
+  function applyNovelFilter() {
+    const inputEl = document.getElementById("novel-search-input");
+    currentNovelSearchQuery = (inputEl ? inputEl.value : "").trim().toLowerCase();
+    renderNovelList();
+  }
+
+  function resetNovelFilter() {
+    currentNovelCategory = "all";
+    currentNovelSearchQuery = "";
+    const inputEl = document.getElementById("novel-search-input");
+    if (inputEl) inputEl.value = "";
+    document.querySelectorAll(".cat-btn").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.cat === "all");
+    });
+    renderNovelList();
+  }
+
+  function isSinglePieceNovel(novel) {
+    const parts = groupNovelIntoParts(novel);
+    const epCount = (novel.chapters || []).filter(c => !c.isDraftPartOnly).length;
+    return epCount <= 1 || (parts.length === 1 && parts[0].partMode === "single");
+  }
+
   function renderNovelList() {
     const listEl = document.getElementById("novel-list");
     const realNovels = getRealNovels();
@@ -1112,7 +1246,51 @@
       return;
     }
 
-    listEl.innerHTML = realNovels.map(novel => {
+    const lastReadId = getLastReadNovelId();
+
+    // 排序：若有看過的作品，上次看的作品放最上面；沒看過的放下面
+    let ordered = realNovels.slice();
+    if (currentNovelCategory === "popular") {
+      ordered.sort((a, b) => (Number(b.views) || 0) - (Number(a.views) || 0));
+    } else if (currentNovelCategory === "topRated") {
+      ordered.sort((a, b) => {
+        const ra = getRatingSummary(a);
+        const rb = getRatingSummary(b);
+        if (rb.avg !== ra.avg) return rb.avg - ra.avg;
+        return rb.count - ra.count;
+      });
+    }
+
+    if (lastReadId) {
+      const topItem = ordered.find(n => n.id === lastReadId);
+      const restItems = ordered.filter(n => n.id !== lastReadId);
+      ordered = topItem ? [topItem, ...restItems] : restItems;
+    }
+
+    // 分類與搜尋篩選
+    const filtered = ordered.filter(novel => {
+      if (currentNovelCategory === "single" && !isSinglePieceNovel(novel)) return false;
+      if (currentNovelCategory === "multi" && isSinglePieceNovel(novel)) return false;
+
+      if (currentNovelSearchQuery) {
+        const title = (novel.title || "").toLowerCase();
+        const author = getDisplayAuthor(novel).toLowerCase();
+        const desc = (novel.description || "").toLowerCase();
+        const match = title.includes(currentNovelSearchQuery)
+          || author.includes(currentNovelSearchQuery)
+          || desc.includes(currentNovelSearchQuery);
+        if (!match) return false;
+      }
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      listEl.innerHTML = "<p style='color:#666;'>找不到符合條件的作品，試試其他關鍵字或按「重設」。</p>";
+      return;
+    }
+
+    listEl.innerHTML = filtered.map(novel => {
+      const isLastRead = Boolean(lastReadId && novel.id === lastReadId);
       const prog = currentUser.progress[novel.id];
       const epObj = (prog && novel.chapters && novel.chapters[prog.chapterIdx]) ? novel.chapters[prog.chapterIdx] : null;
       const progText = prog
@@ -1124,10 +1302,11 @@
       const partsCount = groupNovelIntoParts(novel).length;
       const epCount = (novel.chapters || []).filter(c => !c.isDraftPartOnly).length;
       const delTag = novel.deleteRequested ? `<span class="badge warn">刪除審核中</span>` : "";
+      const topReadTag = isLastRead ? `<span class="badge top-read">📌 上次看的作品</span>` : "";
 
       return `
-        <div class="novel-card">
-          <h3>${novel.title} <span class="badge">作者：${authorLabel}</span> ${delTag}</h3>
+        <div class="novel-card ${isLastRead ? "last-read-card" : ""}">
+          <h3>${topReadTag} ${novel.title} <span class="badge">作者：${authorLabel}</span> ${delTag}</h3>
           <p style="font-size:13px; color:#d98200; font-weight:bold; margin:4px 0;">${ratingInfo.text} ｜ 👁️ 閱讀次數：${viewsCount} 次</p>
           <p style="font-size:14px; color:#555;">${novel.description || "無簡介"}</p>
           <p style="font-size:13px; color:var(--primary); font-weight:bold;">📖 ${progText} ｜ 共 ${partsCount} 篇 / ${epCount} 話</p>
@@ -1939,7 +2118,7 @@
 
   async function updateReaderView() {
     document.getElementById("reader-content").innerText = paginatedPages[currentPage];
-    document.getElementById("page-indicator").innerText = `第 ${currentPage + 1} / ${paginatedPages.length} 頁`;
+    syncPageIndicatorAndJumpSelect();
 
     const stamp = nowText();
     const epObj = activeNovel.chapters[activeEpisodeIdx];
